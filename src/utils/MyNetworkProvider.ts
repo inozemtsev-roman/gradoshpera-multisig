@@ -14,7 +14,7 @@ import {
 import { TonClient } from "@ton/ton";
 
 const API_KEY =
-  "90ca0e6d746da84f69c619a4eae431ed914d181cc5a0e21768a67e40ec568caf";
+  "7f9651056ecab17e83b996a04a90b98c0ddf857b2911c2efae647f6c29b5ffd9";
 
 export const sendToIndex = async (
   method: string,
