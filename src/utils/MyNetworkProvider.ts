@@ -14,7 +14,7 @@ import {
 import { TonClient } from "@ton/ton";
 
 const API_KEY =
-  "7f9651056ecab17e83b996a04a90b98c0ddf857b2911c2efae647f6c29b5ffd9";
+  "d843619b379084d133f061606beecbf72ae2bf60e0622e808f2a3f631673599b";
 
 export const sendToIndex = async (
   method: string,
@@ -49,14 +49,14 @@ export const sendToTonApi = async (
   params: any,
   isTestnet: boolean
 ) => {
-  const mainnetRpc = "https://tonapi.io/v2/";
+  const mainnetRpc = "https://dev.tonapi.io/v2/";
   const testnetRpc = "https://testnet.tonapi.io/v2/";
   const rpc = isTestnet ? testnetRpc : mainnetRpc;
 
   const headers = {
     "Content-Type": "application/json",
     Authorization:
-      "Bearer TC-MSG_6ed8e9b4465dc9f14ccb84b7607d8b558b9b01e9a01a11870fdf0e83a0ae68d185",
+      "Bearer AHIQH4F4Y4XR6UIAAAAOGYUHWOWLUS6ZIPEXSCLAPOMMD6FSNMPUKHCIJHIP52YTU4VKURA",
   };
 
   const response = await fetch(
