@@ -130,12 +130,12 @@ export const checkMultisig = async (
   );
   assert(
     result.status === "active",
-    "Contract not active. If you have just created a multisig it should appear within ~30 seconds."
+    "Контракт не активен. Если вы только что создали мультиподпись, она должна появиться в течение ~30 секунд."
   );
 
   assert(
     Cell.fromBase64(result.code).equals(multisigCode),
-    "The contract code DOES NOT match the multisig code from this repository"
+    "Код контракта НЕ совпадает с кодом мультиподписи из этого репозитория"
   );
 
   const tonBalance = result.balance;
