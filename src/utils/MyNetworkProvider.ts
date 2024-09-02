@@ -56,7 +56,7 @@ export const sendToTonApi = async (
   const headers = {
     "Content-Type": "application/json",
     Authorization:
-      "Bearer AHIQH4F4Y4XR6UIAAAAOGYUHWOWLUS6ZIPEXSCLAPOMMD6FSNMPUKHCIJHIP52YTU4VKURA",
+      "Bearer TC-MSG_6ed8e9b4465dc9f14ccb84b7607d8b558b9b01e9a01a11870fdf0e83a0ae68d185",
   };
 
   const response = await fetch(
