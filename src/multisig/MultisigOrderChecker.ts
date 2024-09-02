@@ -76,10 +76,7 @@ export const checkMultisigOrder = async (
   const parsedData = parseOrderData(data);
 
   checkNumber(parsedData.threshold);
-  assert(
-    parsedData.threshold > 0,
-    "Порог голосующих не является положительным"
-  );
+  assert(parsedData.threshold > 0, "Число подтверждающих не больше нуля");
   assert(
     parsedData.threshold <= parsedData.signers.length,
     "Недопустимый порог"
@@ -198,7 +195,7 @@ export const checkMultisigOrder = async (
     try {
       const slice = cell.beginParse();
       if (slice.remainingBits === 0 && slice.remainingRefs == 0) {
-        return "Отправьте TON с помощью мультикошелька без комментариев";
+        return "Отправьте TON с помощью мультикошелька без комментария";
       }
     } catch (e) {}
 
@@ -219,7 +216,7 @@ export const checkMultisigOrder = async (
       assert(
         parsed.internalMessage.forwardPayload.remainingBits === 0 &&
           parsed.internalMessage.forwardPayload.remainingRefs === 0,
-        "Полезная нагрузка выпуска не поддерживается"
+        "Полезная нагрузка не поддерживается"
       );
       const toAddress = await formatAddressAndUrl(parsed.toAddress, isTestnet);
       return `Выпустить ${
@@ -242,7 +239,7 @@ export const checkMultisigOrder = async (
         parsed.newAdminAddress,
         isTestnet
       );
-      return `Смена адреса администратора на ${newAdminAddress}`;
+      return `Сменить адрес администратора на ${newAdminAddress}`;
     } catch (e) {}
 
     try {
@@ -254,7 +251,7 @@ export const checkMultisigOrder = async (
     try {
       const slice = cell.beginParse();
       const parsed = JettonMinter.parseChangeContent(slice);
-      return `Смена URL метаданных на "${sanitizeHTML(parsed.newMetadataUrl)}"`;
+      return `Сменить метаданные на "${sanitizeHTML(parsed.newMetadataUrl)}"`;
     } catch (e) {}
 
     try {
@@ -268,7 +265,7 @@ export const checkMultisigOrder = async (
         "Отправка не поддерживается"
       );
       const toAddress = await formatAddressAndUrl(parsed.toAddress, isTestnet);
-      return `Отправка ${parsed.jettonAmount} жетонов с адреса мультикошелька на адрес польщователя ${toAddress};`;
+      return `Отправить ${parsed.jettonAmount} жетонов с адреса мультикошелька на адрес пользователя ${toAddress};`;
     } catch (e) {}
 
     try {
@@ -282,7 +279,7 @@ export const checkMultisigOrder = async (
         isTestnet
       );
       const lockType = intToLockType(parsed.action.newStatus);
-      return `Блокировка жетонов пользователя ${userAddress}. Смена состояния "${lockType}" - "${lockTypeToDescription(
+      return `Блокировать жетоны пользователя ${userAddress}. Смена состояния "${lockType}" - "${lockTypeToDescription(
         lockType
       )}"; ${fromNano(parsed.tonAmount)} TON для оплаты газа`;
     } catch (e) {}
@@ -310,9 +307,9 @@ export const checkMultisigOrder = async (
       );
       return `Принудительная отправка ${
         parsed.action.jettonAmount
-      } с адреса польщователя ${fromAddress} на адрес ${toAddress}; ${fromNano(
+      } с адреса пользователя ${fromAddress} на адрес ${toAddress}; ${fromNano(
         parsed.tonAmount
-      )} TON for gas`;
+      )} TON для оплаты комиссии`;
     } catch (e) {}
 
     try {
@@ -328,7 +325,7 @@ export const checkMultisigOrder = async (
         parsed.action.jettonAmount
       } жетонов с адреса пользователя ${userAddress}; ${fromNano(
         parsed.tonAmount
-      )} TON for gas`;
+      )} TON для оплаты комиссии`;
     } catch (e) {}
 
     throw new Error("Неподдерживаемое действие");
@@ -351,22 +348,20 @@ export const checkMultisigOrder = async (
       let allBalance = false;
 
       if (sendMode & 1) {
-        sendModeString.push("Pays fees separately");
+        sendModeString.push("Комиссия оплачиваются отдельно");
       }
       if (sendMode & 2) {
-        sendModeString.push("Ignore sending errors");
+        sendModeString.push("Игнорировать ошибки");
       }
       if (sendMode & 128) {
         allBalance = true;
-        sendModeString.push("CARRY ALL BALANCE");
+        sendModeString.push("ПЕРЕНЕСТИ ВЕСЬ БАЛАНС");
       }
       if (sendMode & 64) {
-        sendModeString.push(
-          "Carry all the remaining value of the inbound message"
-        );
+        sendModeString.push("Перенести весь остаток входящего сообщения");
       }
       if (sendMode & 32) {
-        sendModeString.push("DESTROY ACCOUNT");
+        sendModeString.push("УНИЧТОЖИТЬ АККАУНТ");
       }
 
       const actionBody = slice.loadRef();
@@ -377,14 +372,16 @@ export const checkMultisigOrder = async (
       const info: CommonMessageInfoRelaxedInternal = messageRelaxed.info as any;
 
       const destAddress = await formatAddressAndUrl(info.dest, isTestnet);
-      actionString += `<div>Send ${
-        allBalance ? "ALL BALANCE" : fromNano(info.value.coins)
-      } TON to ${destAddress}</div>`;
+      actionString += `<div>Отправить ${
+        allBalance ? "ВЕСЬ БАЛАНС" : fromNano(info.value.coins)
+      } TON на адрес ${destAddress}</div>`;
       actionString += `<div>${await parseActionBody(
         messageRelaxed.body
       )}</div>`;
       if (sendMode) {
-        actionString += `<div>Send mode: ${sendModeString.join(", ")}.</div>`;
+        actionString += `<div>Метод отправки: ${sendModeString.join(
+          ", "
+        )}.</div>`;
       }
     } else if (actionOp === 0x1d0cfbd3) {
       // update_multisig_params
@@ -395,9 +392,9 @@ export const checkMultisigOrder = async (
         : [];
       endParse(slice);
 
-      assert(newSigners.length > 0, "Invalid new signers");
-      assert(newThreshold > 0, "Invalid new threshold");
-      assert(newThreshold <= newSigners.length, "Invalid new threshold");
+      assert(newSigners.length > 0, "Неправильный кошелек подписывающего");
+      assert(newThreshold > 0, "Неверное значение порога голосования");
+      assert(newThreshold <= newSigners.length, "Неверный порог");
 
       actionString += `<div>Обновить параметры мультикошелька</div>`;
       actionString += `<div>Новый порог подписей : ${newThreshold.toString()}</div>`;
