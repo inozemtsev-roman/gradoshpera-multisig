@@ -1019,7 +1019,7 @@ const orderTypes: OrderType[] = [
   },
 
   {
-    name: "Запросить кошелек администратора",
+    name: "Заявить права администратора",
     fields: {
       jettonMinterAddress: {
         name: "Адрес контракта жетона",

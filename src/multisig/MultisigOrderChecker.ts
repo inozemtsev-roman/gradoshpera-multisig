@@ -245,7 +245,7 @@ export const checkMultisigOrder = async (
     try {
       const slice = cell.beginParse();
       const parsed = JettonMinter.parseClaimAdmin(slice);
-      return `Запросить адрес администратора`;
+      return `Заявить права администратора`;
     } catch (e) {}
 
     try {
