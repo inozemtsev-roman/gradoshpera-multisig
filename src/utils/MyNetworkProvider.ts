@@ -14,7 +14,7 @@ import {
 import { TonClient } from "@ton/ton";
 
 const API_KEY =
-  "d843619b379084d133f061606beecbf72ae2bf60e0622e808f2a3f631673599b";
+  "7f9651056ecab17e83b996a04a90b98c0ddf857b2911c2efae647f6c29b5ffd9";
 
 export const sendToIndex = async (
   method: string,
@@ -56,7 +56,7 @@ export const sendToTonApi = async (
   const headers = {
     "Content-Type": "application/json",
     Authorization:
-      "Bearer AHIQH4F4Y4XR6UIAAAAOGYUHWOWLUS6ZIPEXSCLAPOMMD6FSNMPUKHCIJHIP52YTU4VKURA",
+      "Bearer AGYXWYSMCNSXEZAAAAAEDOF3VZC56OCNV7RMX22GM3NOLJCKT2Y6PN3HVZKOGAPZHSK7U5Y",
   };
 
   const response = await fetch(
