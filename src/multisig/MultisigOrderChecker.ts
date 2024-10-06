@@ -124,7 +124,7 @@ export const checkMultisigOrder = async (
         multisigInfo.signers.map((a) => a.address),
         parsedData.signers
       ),
-      "Количество подтверждающих не совпадает с количествои в заявке"
+      "Количество подтверждающих не совпадает с количеством в заявке"
     );
   }
 
