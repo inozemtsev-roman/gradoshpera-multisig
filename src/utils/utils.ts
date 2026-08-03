@@ -15,12 +15,12 @@ export const validateUserFriendlyAddress = (s: string, isTestnet: boolean): stri
     if (Address.isFriendly(s)) {
         const address = Address.parseFriendly(s);
         if (address.isTestOnly && !isTestnet) {
-            return "Please enter mainnet address";
+            return "Пожалуйста, введите адрес основной сети";
         } else {
             return null;
         }
     } else {
-        return 'Invalid address';
+        return 'Некорректный адрес';
     }
 }
 

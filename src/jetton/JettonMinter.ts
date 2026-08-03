@@ -66,13 +66,13 @@ export const intToLockType = (lockType: number): LockType => {
 export const lockTypeToDescription = (lockType: LockType) => {
     switch (lockType) {
         case 'unlock':
-            return 'Unlock';
+            return 'Разблокирован';
         case 'out':
-            return 'Outgoing transfers locked';
+            return 'Исходящие переводы заблокированы';
         case 'in':
-            return 'Inbound transfers locked';
+            return 'Входящие переводы заблокированы';
         case 'full':
-            return 'Outgoing and Inbound transfers locked';
+            return 'Исходящие и входящие переводы заблокированы';
     }
 }
 
