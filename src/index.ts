@@ -316,7 +316,7 @@ const renderCurrentMultisigInfo = (): void => {
     if (lastOrder.errorMessage) {
       if (lastOrder.errorMessage.startsWith("Контракт не активен")) return ``;
       if (lastOrder.errorMessage.startsWith("Неудача")) {
-        return `<div class="multisig_lastOrder" order-id="${lastOrder.order.id}" order-address="${addressToString(lastOrder.order.address)}"><span class="orderListItem_title">Неудачная заявка №${lastOrder.order.id}</span> — Ошибка выполнения — <a href="https://tonscan.org/tx/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a></div>`;
+        return `<div class="multisig_lastOrder" order-id="${lastOrder.order.id}" order-address="${addressToString(lastOrder.order.address)}"><span class="orderListItem_title">Неудачная заявка №${lastOrder.order.id}</span> — Ошибка выполнения — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a></div>`;
       }
       return `<div class="multisig_lastOrder" order-id="${lastOrder.order.id}" order-address="${addressToString(lastOrder.order.address)}"><span class="orderListItem_title">Недействительная заявка №${lastOrder.order.id}</span> — ${lastOrder.errorMessage}</div>`;
     } else {
@@ -346,9 +346,9 @@ const renderCurrentMultisigInfo = (): void => {
 
       if (lastOrder.type === "executed") {
         if (lastOrder.executionStatus === "checking") {
-          text += ` — Проверка статуса транзакции… — <a href="https://tonscan.org/tx/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
+          text += ` — Проверка статуса транзакции… — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
         } else {
-          text += ` — <a href="https://tonscan.org/tx/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
+          text += ` — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
         }
       }
 
@@ -520,7 +520,7 @@ const renderCurrentOrderInfo = (): void => {
       (lo) => lo.order.id === currentOrderInfo.orderId,
     );
     if (lastOrder) {
-      executedTxLink += ` — <a href="https://tonscan.org/tx/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
+      executedTxLink += ` — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
     }
   }
 
