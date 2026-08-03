@@ -204,9 +204,9 @@ export const checkMultisig = async (
     // Account State and Data
 
     const result = await sendToIndex('account', {address: addressToString(multisigAddress)}, isTestnet);
-    assert(result.status === 'active', "Contract not active. If you have just created a multisig it should appear within ~30 seconds.");
+    assert(result.status === 'active', "Контракт не активен. Если вы только что создали мультикошелек, он должен появиться в течение ~30 секунд.");
 
-    assert(Cell.fromBase64(result.code).equals(multisigCode), 'The contract code DOES NOT match the multisig code from this repository');
+    assert(Cell.fromBase64(result.code).equals(multisigCode), 'Код контракта НЕ совпадает с кодом мультикошелька из этого репозитория');
 
     const tonBalance = result.balance;
 
@@ -214,15 +214,15 @@ export const checkMultisig = async (
     const parsedData = parseMultisigData(data);
 
     if (parsedData.allowArbitraryOrderSeqno) {
-        assert(parsedData.nextOderSeqno === BigInt(0), 'invalid nextOrderSeqno for allowArbitraryOrderSeqno');
+        assert(parsedData.nextOderSeqno === BigInt(0), 'Некорректный nextOrderSeqno для allowArbitraryOrderSeqno');
     }
 
     const signers = parsedData.signers;
     const proposers = parsedData.proposers;
 
-    assert(signers.length === parsedData.signersCount, 'invalid signersCount');
-    assert(parsedData.threshold > 0, 'threshold <= 0');
-    assert(parsedData.threshold <= parsedData.signersCount, 'invalid threshold');
+    assert(signers.length === parsedData.signersCount, 'Некорректное количество подписантов');
+    assert(parsedData.threshold > 0, 'Порог <= 0');
+    assert(parsedData.threshold <= parsedData.signersCount, 'Некорректный порог');
 
     const signersFormatted = [];
     for (const signer of signers) {
@@ -391,7 +391,7 @@ export const checkMultisig = async (
                         utime: tx.now,
                         transactionHash: tx.hash,
                         type: 'new',
-                        errorMessage: 'Invalid new order: ' + e.message
+                        errorMessage: 'Недействительный новый заказ: ' + e.message
                     })
                 }
             }
@@ -461,7 +461,7 @@ export const checkMultisig = async (
                             lastOrder.type = 'executed';
                         } else if (orderInfo.isMismatchSigners || orderInfo.isMismatchThreshold) {
                             lastOrder.type = 'executed';
-                            lastOrder.errorMessage = 'Multisig signers or threshold do not match order';
+                            lastOrder.errorMessage = 'Подписанты или порог мультикошелька не совпадают с заказом';
                         }
                     } catch (e) {
                         lastOrder.type = 'executed';
@@ -489,7 +489,7 @@ export const checkMultisig = async (
                     lastOrder.executionStatus = 'checking';
                 } else if (failedHashes.has(lastOrder.transactionHash)) {
                     lastOrder.executionStatus = 'failed';
-                    lastOrder.errorMessage = 'Failed';
+                    lastOrder.errorMessage = 'Неудача';
                 } else {
                     lastOrder.executionStatus = 'success';
                 }
