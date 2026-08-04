@@ -1,9 +1,23 @@
+:root {
+    --bg-color: #1e2337;
+    --bg-secondary: #252b45;
+    --bg-input: #252b45;
+    --border-color: #3a4259;
+    --text-color: #e8eaf3;
+    --text-secondary: #8b91a8;
+    --link-color: #4da3ff;
+    --primary: #0088cc;
+    --error: #ff7b84;
+}
+
 html, body {
     font-family: Helvetica, Arial, SansSerif;
     height: 100%;
     margin: 0;
     padding: 0;
     line-height: 200%;
+    background-color: var(--bg-color);
+    color: var(--text-color);
 }
 
 * {
@@ -11,7 +25,7 @@ html, body {
 }
 
 a, a:active, a:focus, a:hover {
-    color: #0088cc;
+    color: var(--link-color);
     text-decoration: none;
 }
 
@@ -19,12 +33,23 @@ input, select {
     font-family: Helvetica, Arial, SansSerif;
     text-align: left;
     font-size: 14px;
-    color: black;
-    border: 1px solid #C0D1D9;
+    color: var(--text-color);
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
     border-radius: 2px;
     padding: 10px;
 
     margin-bottom: 20px;
+}
+
+select option {
+    background-color: var(--bg-input);
+    color: var(--text-color);
+}
+
+input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text-color);
+    -webkit-box-shadow: 0 0 0 1000px var(--bg-input) inset;
 }
 
 select {
@@ -46,7 +71,7 @@ button, .btn {
     background: none;
     /*background-color: #0088cc;*/
     font-size: 16px;
-    color: #0088cc;
+    color: var(--link-color);
     border-radius: 40px;
     padding: 12px 24px;
     line-height: 24px;
@@ -59,7 +84,7 @@ button, .btn {
 .btn-primary {
     border: none;
     background: none;
-    background-color: #0088cc;
+    background-color: var(--primary);
     font-size: 16px;
     color: white;
     border-radius: 40px;
@@ -106,7 +131,17 @@ button:disabled, .btn:disabled {
 .label {
     font-weight: bold;
     flex-shrink: 0;
-    color: black !important;
+    color: var(--text-color) !important;
+}
+
+.value,
+#multisig_signersList,
+#multisig_proposersList,
+#order_signersList,
+#order_actions,
+#mainScreen_ordersList {
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 #multisig_logoutButton {
@@ -164,7 +199,7 @@ button:disabled, .btn:disabled {
     font-weight: bold;
     line-height: 16px;
     cursor: pointer;
-    color: #04060B;
+    color: var(--text-color);
 }
 
 #header_grow {
@@ -212,7 +247,7 @@ button:disabled, .btn:disabled {
 
 .badge {
     display: inline-block;
-    background-color: #0088cc;
+    background-color: var(--primary);
     color: white;
     padding: 4px;
     border-radius: 4px;
@@ -240,19 +275,19 @@ button:disabled, .btn:disabled {
 #mainScreen_ordersList div {
     padding-top: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #ebebeb;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .orderListItem_title {
-    color: #0088cc;
+    color: var(--link-color);
 }
 
 #multisig_error {
-    color: #ec6471;
+    color: var(--error);
 }
 
 .error {
-    color: #ec6471;
+    color: var(--error);
 }
 
 .multisig_lastOrder {
@@ -274,7 +309,7 @@ button:disabled, .btn:disabled {
 }
 
 #order_error {
-    color: #ec6471;
+    color: var(--error);
 }
 
 
@@ -283,7 +318,7 @@ button:disabled, .btn:disabled {
 }
 
 #order_approveNote {
-    color: #696969;
+    color: var(--text-secondary);
     text-align: center;
     justify-content: center;
 }
@@ -293,7 +328,7 @@ button:disabled, .btn:disabled {
 .line {
     margin-top: 10px;
     margin-bottom: 10px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color);
 }
 
 #newMultisig_addProposerButton, #newMultisig_addSignerButton {

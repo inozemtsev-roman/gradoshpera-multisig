@@ -185,7 +185,7 @@ const tonConnectUI = new TonConnectUI({
 
 tonConnectUI.uiOptions = {
   uiPreferences: {
-    theme: THEME.LIGHT,
+    theme: THEME.DARK,
   },
 };
 
