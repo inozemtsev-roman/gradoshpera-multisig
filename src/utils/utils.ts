@@ -49,10 +49,15 @@ export const formatAddressAndUrl = async (address: Address, isTestnet: boolean) 
     return makeAddressLink(f);
 }
 
+export const shortAddress = (addressString: string): string => {
+    if (addressString.length <= 20) return addressString;
+    return addressString.slice(0, 8) + '...' + addressString.slice(-8);
+}
+
 export const makeAddressLink = (address: AddressInfo) => {
     const addressString = addressToString(address);
     const url = explorerUrl(addressString, address.isTestOnly);
-    return `<a href="${url}" target="_blank">${addressString}</a>`;
+    return `<a href="${url}" target="_blank" title="${addressString}">${shortAddress(addressString)}</a>`;
 }
 
 export const addressToString = (address: AddressInfo) => {
