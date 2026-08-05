@@ -561,12 +561,25 @@ const cellFromTonapiString = (s: string): Cell => {
   return Cell.fromBase64(s);
 };
 
+// BigInt('-0x1') кидает исключение — разбираем знак вручную.
+const numToBigInt = (s: string): bigint => {
+  let str = String(s);
+  let neg = false;
+  if (str.startsWith("-")) {
+    neg = true;
+    str = str.slice(1);
+  }
+  const v = BigInt(str);
+  return neg ? -v : v;
+};
+
 const tonApiStackToCore = (item: any): TupleItem => {
   switch (item?.type) {
     case "null":
       return { type: "null" };
     case "int":
-      return { type: "int", value: BigInt(item.num) };
+    case "num":
+      return { type: "int", value: numToBigInt(item.num) };
     case "cell":
       return { type: "cell", cell: cellFromTonapiString(item.cell) };
     case "slice":
