@@ -496,6 +496,21 @@ const updateApproveButton = (
   ($("#order_approveButton") as HTMLButtonElement).disabled = isApproving;
 };
 
+const MONTHS_GENITIVE = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
+
 const formatDateRu = (date: Date): string => {
   const offsetMin = -date.getTimezoneOffset();
   const abs = Math.abs(offsetMin);
@@ -506,18 +521,19 @@ const formatDateRu = (date: Date): string => {
     Math.floor(abs / 60) +
     (abs % 60 !== 0 ? ":" + String(abs % 60).padStart(2, "0") : "") +
     ")";
-  return (
-    date.toLocaleString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    }) +
+  const dateStr =
+    date.getDate() +
     " " +
-    offsetStr
-  );
+    MONTHS_GENITIVE[date.getMonth()] +
+    " " +
+    date.getFullYear() +
+    " года";
+  const timeStr = date.toLocaleString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  return dateStr + ", " + timeStr + " " + offsetStr;
 };
 
 const renderCurrentOrderInfo = (): void => {
