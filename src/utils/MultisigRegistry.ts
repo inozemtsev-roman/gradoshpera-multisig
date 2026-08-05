@@ -1,8 +1,6 @@
 import { Address, Cell } from "@ton/core";
-import { JettonMinter } from "../jetton/JettonMinter";
-import { JettonWallet } from "../jetton/JettonWallet";
 import { parseMultisigData } from "../multisig/Multisig";
-import { getProxyUrl, MyNetworkProvider, sendToIndex } from "./MyNetworkProvider";
+import { getProxyUrl, sendToIndex } from "./MyNetworkProvider";
 
 export interface RegistryJetton {
   name: string;
@@ -145,6 +143,10 @@ const enrichJettons = (entries: RegistryEntry[]): RegistryEntry[] => {
 const finalizeEntries = (file: RegistryFile): RegistryEntry[] =>
   enrichJettons(normalizeEntries(file));
 
+// Снапшот-записи реестра — доступны синхронно, без сети (мгновенный показ карточек).
+export const getSnapshotEntries = (): RegistryEntry[] =>
+  finalizeEntries(SNAPSHOT);
+
 // Реестр мультикошельков ДАО: прямой raw.githubusercontent.com -> прокси -> снапшот.
 export const fetchRegistry = async (force = false): Promise<RegistryEntry[]> => {
   if (!force) {
@@ -247,23 +249,21 @@ export const fetchMultisigStatus = async (
 };
 
 // Баланс жетона ДАО на кошельке мультикошелька (в минимальных единицах жетона).
+// Пустой/неактивированный кошелёк жетона считается нулевым балансом.
 export const fetchJettonBalance = async (
   jettonAddress: string,
   ownerAddress: string,
   isTestnet: boolean,
 ): Promise<string> => {
   try {
-    const minter = JettonMinter.createFromAddress(
-      Address.parseFriendly(jettonAddress).address,
+    const jettonRaw = Address.parseFriendly(jettonAddress).address.toRawString();
+    const ownerRaw = Address.parseFriendly(ownerAddress).address.toRawString();
+    const data = await sendToIndex(
+      "jettonBalance",
+      { account: ownerRaw, jetton: jettonRaw },
+      isTestnet,
     );
-    const provider = new MyNetworkProvider(minter.address, isTestnet);
-    const walletAddress = await minter.getWalletAddress(
-      provider,
-      Address.parseFriendly(ownerAddress).address,
-    );
-    const wallet = JettonWallet.createFromAddress(walletAddress);
-    const data = await wallet.getWalletData(provider);
-    return String(data.balance);
+    return data && data.balance != null ? String(data.balance) : "";
   } catch (e: any) {
     console.warn("fetchJettonBalance failed:", e);
     return "";
