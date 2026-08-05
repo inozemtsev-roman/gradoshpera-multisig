@@ -554,6 +554,13 @@ const tonApiArgFromCore = (item: TupleItem): string => {
   }
 };
 
+// tonapi в стеке get-методов отдаёт ячейки в HEX (не base64).
+const cellFromTonapiString = (s: string): Cell => {
+  if (!s) throw new Error("Пустая ячейка в ответе tonapi");
+  if (isHex(s)) return Cell.fromBoc(Buffer.from(s, "hex"))[0];
+  return Cell.fromBase64(s);
+};
+
 const tonApiStackToCore = (item: any): TupleItem => {
   switch (item?.type) {
     case "null":
@@ -561,13 +568,13 @@ const tonApiStackToCore = (item: any): TupleItem => {
     case "int":
       return { type: "int", value: BigInt(item.num) };
     case "cell":
-      return { type: "cell", cell: Cell.fromBase64(item.cell) };
+      return { type: "cell", cell: cellFromTonapiString(item.cell) };
     case "slice":
-      return { type: "slice", cell: Cell.fromBase64(item.slice) };
+      return { type: "slice", cell: cellFromTonapiString(item.slice) };
     case "builder":
       return {
         type: "builder",
-        cell: Cell.fromBase64(item.cell || item.builder),
+        cell: cellFromTonapiString(item.cell || item.builder),
       };
     case "tuple":
       return {
