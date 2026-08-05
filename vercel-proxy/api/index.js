@@ -14,6 +14,7 @@ const ALLOWED_HOSTS = new Set([
   'testnet.toncenter.com',
   'tonapi.io',
   'testnet.tonapi.io',
+  'raw.githubusercontent.com',
 ]);
 
 const CORS = {

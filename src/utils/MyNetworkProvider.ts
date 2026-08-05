@@ -39,7 +39,7 @@ interface Provider {
   ) => Promise<any>;
 }
 
-const getProxyUrl = (): string => {
+export const getProxyUrl = (): string => {
   try {
     const stored =
       typeof localStorage !== "undefined"

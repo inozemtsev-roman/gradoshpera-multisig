@@ -15,6 +15,7 @@ import {
   equalsAddressLists,
   equalsMsgAddresses,
   makeAddressLink,
+  sanitizeHTML,
   validateUserFriendlyAddress,
 } from "./utils/utils";
 import {
@@ -38,6 +39,16 @@ import { toUnits } from "./utils/units";
 import { checkJettonMinter } from "./jetton/JettonMinterChecker";
 import { storeStateInit } from "@ton/core/src/types/StateInit";
 import { MyNetworkProvider, sendToIndex } from "./utils/MyNetworkProvider";
+import {
+  addOpenedMultisig,
+  fetchMultisigStatus,
+  fetchRegistry,
+  loadOpenedMultisigs,
+  mapWithConcurrency,
+  MultisigStatus,
+  Role,
+  STATUS_CONCURRENCY,
+} from "./utils/MultisigRegistry";
 import { Order } from "./multisig/Order";
 import { JettonWallet } from "./jetton/JettonWallet";
 import {
@@ -135,6 +146,7 @@ const showScreen = (name: ScreenType): void => {
       clearMultisig();
       clearOrder();
       clearUrlState();
+      renderDaoMultisigs();
       break;
     case "importScreen":
       ($("#import_input") as HTMLInputElement).value = "";
@@ -195,6 +207,10 @@ const tonConnectUnsubscribe = tonConnectUI.onStatusChange((info) => {
     myAddress = null;
   } else if (info.account) {
     myAddress = Address.parseRaw(info.account.address);
+  }
+
+  if (currentScreen === "startScreen") {
+    renderDaoMultisigs();
   }
 
   if (currentMultisigAddress && currentMultisigInfo) {
@@ -445,6 +461,7 @@ const setMultisigAddress = async (
 
   currentMultisigAddress = newMultisigAddress;
   localStorage.setItem("multisigAddress", newMultisigAddress);
+  addOpenedMultisig(newMultisigAddress);
   pushUrlState(newMultisigAddress, queuedOrderId);
 
   const multisigAddress = Address.parseFriendly(currentMultisigAddress);
@@ -467,6 +484,123 @@ $("#multisig_createNewOrderButton").addEventListener("click", () => {
 
 $("#multisig_updateButton").addEventListener("click", () => {
   showNewMultisigScreen("update");
+});
+
+// DAO MULTISIGS
+
+const daoMultisigsBlock = $("#daoMultisigsBlock");
+const daoMultisigsList = $("#daoMultisigsList");
+
+let daoRenderSeq = 0;
+
+const rawOfRegistry = (friendly: string): string => {
+  try {
+    return Address.parseFriendly(friendly).address.toRawString();
+  } catch {
+    return friendly;
+  }
+};
+
+const roleBadgeHTML = (role: Role): string =>
+  role === "signer"
+    ? ' <span class="badge">Подписывающий</span>'
+    : role === "proposer"
+      ? ' <span class="badge">Предлагающий</span>'
+      : "";
+
+const daoMultisigItemHTML = (
+  name: string,
+  address: string,
+  status: MultisigStatus,
+): string => {
+  const info = Address.parseFriendly(address);
+  info.isBounceable = true;
+  info.isTestOnly = IS_TESTNET;
+
+  let line: string;
+  if (status.ok) {
+    if (status.isMultisig) {
+      line = `${makeAddressLink(info)} — ${fromNano(BigInt(status.balance || "0"))} GRAM${roleBadgeHTML(status.role)}`;
+    } else {
+      line = `${makeAddressLink(info)} — не мультикошелек`;
+    }
+  } else {
+    line = `${makeAddressLink(info)} — ${sanitizeHTML(status.error || "Ошибка проверки")}`;
+  }
+
+  return `<div class="daoMultisigItem" data-address="${address}"><div class="daoMultisigName">${sanitizeHTML(name)}</div><div>${line}</div></div>`;
+};
+
+const renderDaoMultisigs = async (force = false): Promise<void> => {
+  if (!daoMultisigsBlock || !daoMultisigsList) return;
+  const seq = ++daoRenderSeq;
+  daoMultisigsBlock.style.display = "flex";
+  daoMultisigsList.innerHTML = '<div class="value">Загрузка…</div>';
+
+  const entries = await fetchRegistry(force);
+  if (seq !== daoRenderSeq) return;
+
+  const seen = new Set<string>();
+  const items: { name: string; address: string; mine: boolean }[] = [];
+
+  for (const entry of entries) {
+    if (entry.testnet !== IS_TESTNET) continue;
+    const raw = rawOfRegistry(entry.address);
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    items.push({ name: entry.name, address: entry.address, mine: false });
+  }
+
+  if (myAddress) {
+    const opened = loadOpenedMultisigs();
+    for (const openedItem of opened) {
+      const raw = rawOfRegistry(openedItem.address);
+      if (seen.has(raw)) continue;
+      seen.add(raw);
+      items.push({ name: "", address: openedItem.address, mine: true });
+    }
+  }
+
+  if (items.length === 0) {
+    daoMultisigsList.innerHTML = '<div class="value">Список пуст</div>';
+    return;
+  }
+
+  const statuses = await mapWithConcurrency(
+    items,
+    STATUS_CONCURRENCY,
+    (item) =>
+      fetchMultisigStatus(item.address, MULTISIG_CODE, IS_TESTNET, myAddress),
+  );
+  if (seq !== daoRenderSeq) return;
+
+  let html = "";
+  let mineStarted = false;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.mine && !mineStarted) {
+      html +=
+        '<div class="label daoMultisigMineLabel">Ваши мультикошельки:</div>';
+      mineStarted = true;
+    }
+    html += daoMultisigItemHTML(item.name, item.address, statuses[i]);
+  }
+  daoMultisigsList.innerHTML = html;
+};
+
+daoMultisigsList.addEventListener("click", (e) => {
+  const target = e.target as HTMLElement;
+  if (target.closest("a")) return;
+  const itemEl = target.closest(".daoMultisigItem");
+  if (!itemEl) return;
+  const address = itemEl.getAttribute("data-address");
+  if (address) {
+    setMultisigAddress(address);
+  }
+});
+
+$("#daoMultisigsRefresh").addEventListener("click", () => {
+  renderDaoMultisigs(true);
 });
 
 // ORDER SCREEN

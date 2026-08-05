@@ -8,7 +8,7 @@
 
     <title>Мультикошелек</title>
 
-    <link rel="stylesheet" href="css/main.css?6">
+    <link rel="stylesheet" href="css/main.css?7">
 </head>
 
 <body>
@@ -33,6 +33,12 @@
     <div id="startScreen" class="screen">
         <button id="createMultisigButton">Создать новый мультикошелек</button>
         <button id="importMultisigButton">Импортировать мультикошелек</button>
+
+        <div id="daoMultisigsBlock" class="panel" style="display: none">
+            <div class="label">Мультикошельки ДАО</div>
+            <div id="daoMultisigsList"></div>
+            <button id="daoMultisigsRefresh">Обновить</button>
+        </div>
     </div>
 
     <div id="importScreen" class="screen">
