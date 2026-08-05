@@ -39,15 +39,28 @@ export const sendToIndex = async (method: string, params: Record<string, IndexQu
         }
     }
 
-    const response = await fetch(rpc + method + '?' + query, {
-        method: 'GET',
-        headers: headers,
-    });
-    const json = await response.json();
-    if (json.error) {
-        throw new Error(json.error);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+        const response = await fetch(rpc + method + '?' + query, {
+            method: 'GET',
+            headers: headers,
+            signal: controller.signal,
+        });
+        const json = await response.json();
+        if (json.error) {
+            throw new Error(json.error);
+        }
+        return json;
+    } catch (e: any) {
+        if (controller.signal.aborted) {
+            throw new Error('Timeout: сервер API не отвечает. Проверьте интернет-соединение.');
+        }
+        throw e;
+    } finally {
+        clearTimeout(timeoutId);
     }
-    return json;
 }
 
 export class MyNetworkProvider implements ContractProvider {
