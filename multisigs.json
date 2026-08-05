@@ -1,0 +1,9 @@
+{
+  "testnet": false,
+  "multisigs": [
+    {
+      "name": "ДАО Градосфера",
+      "address": "EQAbRLmFnI7y5BUmSVvxsz3X4Ejy50uMkgvXPmevthl5K3n9"
+    }
+  ]
+}
