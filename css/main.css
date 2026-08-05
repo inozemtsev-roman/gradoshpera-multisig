@@ -407,3 +407,54 @@ button:disabled, .btn:disabled {
 .address-input input {
     flex-grow: 1;
 }
+
+/* DAO MULTISIGS */
+
+#daoMultisigsBlock {
+    margin-top: 0;
+    max-width: 700px;
+    width: 100%;
+}
+
+#daoMultisigsList {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.daoMultisigItem {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+}
+
+.daoMultisigItem:hover {
+    background-color: var(--bg-secondary);
+}
+
+.daoMultisigName {
+    font-weight: 600;
+}
+
+.daoMultisigMineLabel {
+    margin-top: 20px;
+}
+
+#daoMultisigsRefresh {
+    align-self: flex-start;
+}
+
+.daoBalance {
+    white-space: nowrap;
+}
+
+.daoBalanceLogo {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 4px;
+}

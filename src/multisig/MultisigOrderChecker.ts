@@ -69,12 +69,12 @@ export const checkMultisigOrder = async (
   );
   assert(
     result.status === "active",
-    "Контракт не активен. Если вы только что создали заказ, он должен появиться в течение ~30 секунд.",
+    "Контракт не активен. Если вы только что создали заявку, она должна появиться в течение ~30 секунд.",
   );
 
   assert(
     Cell.fromBase64(result.code).equals(multisigOrderCode),
-    "Код контракта НЕ совпадает с кодом заказа мультикошелька из этого репозитория",
+    "Код контракта НЕ совпадает с кодом заявки мультикошелька из этого репозитория",
   );
 
   const tonBalance = result.balance;
@@ -118,7 +118,7 @@ export const checkMultisigOrder = async (
 
   assert(
     multisigOrderToCheck.address.equals(multisigOrderAddress.address),
-    "Поддельный заказ мультикошелька",
+    "Поддельный заявка мультикошелька",
   );
 
   let isMismatchSigners = false;
@@ -199,7 +199,7 @@ export const checkMultisigOrder = async (
     try {
       const slice = cell.beginParse();
       if (slice.remainingBits === 0 && slice.remainingRefs == 0) {
-        return "Отправить TON с мультикошелька без комментария";
+        return "Отправить GRAM с мультикошелька без комментария";
       }
     } catch (e) {}
 
@@ -208,7 +208,7 @@ export const checkMultisigOrder = async (
       const op = slice.loadUint(32);
       if (op == 0) {
         const text = slice.loadStringTail();
-        return `Отправить TON с мультикошелька с комментарием "${sanitizeHTML(text)}"`;
+        return `Отправить GRAM с мультикошелька с комментарием "${sanitizeHTML(text)}"`;
       }
     } catch (e) {}
 
@@ -401,7 +401,7 @@ export const checkMultisigOrder = async (
       console.error(e);
     }
 
-    return `<b><span class="error">ВНИМАНИЕ - Неизвестное действие! Этот заказ содержит произвольные действия! Опасно! Не подписывайте, если точно не знаете, что делаете!</span></b><br>Необработанные данные тела сообщения: "${cell.toBoc().toString("base64")}".`;
+    return `<b><span class="error">ВНИМАНИЕ - Неизвестное действие! Эта заявка содержит произвольные действия! Опасно! Не подписывайте, если точно не знаете, что делаете!</span></b><br>Необработанные данные тела сообщения: "${cell.toBoc().toString("base64")}".`;
   };
 
   let parsedActions: string[] = [];
@@ -437,7 +437,7 @@ export const checkMultisigOrder = async (
       }
       if (sendMode & 32) {
         throw new Error(
-          "Заказ недействителен, потому что его режим отправки (+32) удалит мультикошелек",
+          "Заявка недействительна, потому что режим отправки (+32) удалит мультикошелек",
         );
       }
 
@@ -449,11 +449,11 @@ export const checkMultisigOrder = async (
       const info: CommonMessageInfoRelaxedInternal = messageRelaxed.info as any;
 
       if (info.ihrFee !== 0n) {
-        throw new Error("Заказ недействителен: IHR-комиссия больше 0");
+        throw new Error("Заявка недействительна: IHR-комиссия больше 0");
       }
 
       if (info.forwardFee !== 0n) {
-        throw new Error("Заказ недействителен: форвард-комиссия больше 0");
+        throw new Error("Заявка недействительна: форвард-комиссия больше 0");
       }
 
       const destAddress = await formatAddressAndUrl(info.dest, isTestnet);
