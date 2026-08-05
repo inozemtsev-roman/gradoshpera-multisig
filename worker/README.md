@@ -55,13 +55,11 @@ wrangler deploy
 
 Если прокси задан — он пробуется первым, затем прямые toncenter/tonapi.
 
-## Маршруты
+## Маршрут
 
-| Путь воркера                      | Куда идёт                              |
-|-----------------------------------|----------------------------------------|
-| `/toncenter/<метод>?<params>`     | `toncenter.com/api/v3/<метод>?<params>` |
-| `/toncenter-testnet/<метод>?<params>` | `testnet.toncenter.com/api/v3/...`  |
-| `/tonapi/<путь>`                  | `tonapi.io/<путь>`                     |
-| `/tonapi-testnet/<путь>`          | `testnet.tonapi.io/<путь>`              |
+`GET /api/?url=<upstream>` — единственный маршрут. Воркер сам определяет хост
+и подставляет API-ключ toncenter серверно (ключ не светится в браузере).
+Допускаются только хосты: toncenter.com, testnet.toncenter.com, tonapi.io, testnet.tonapi.io.
 
-API-ключ toncenter зашит в воркер и подставляется серверно, ключ не светится в браузере.
+> Альтернатива Cloudflare: этот же прокси можно развернуть на Vercel без токенов —
+> см. `vercel-proxy/README.md`.

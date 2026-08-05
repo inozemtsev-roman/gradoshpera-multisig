@@ -4,28 +4,25 @@
 // браузер ходит на ваш воркер (workers.dev или свой домен), а воркер сам обращается
 // к toncenter/tonapi со своего edge-сервера.
 //
-// Как задеплоить:
-//   1. npm i -g wrangler
-//   2. cd worker
-//   3. wrangler deploy   (нужен аккаунт Cloudflare)
-//   4. Прокси-URL из вывода (вида https://multisig-proxy.<ваш-аккаунт>.workers.dev)
-//      впишите в src/utils/MyNetworkProvider.ts в константу PROXY_URL,
-//      либо задайте в браузере: localStorage.setItem('proxy_url', '<URL>')
+// Единственный маршрут: GET {worker}/api/?url=<upstream URL в полном виде>
+// Например: /api/?url=https%3A%2F%2Ftoncenter.com%2Fapi%2Fv3%2Faccount%3Faddress%3DUQ...
 //
-// Маршруты:
-//   /toncenter/<method>?<params>      -> https://toncenter.com/api/v3/<method>?<params>
-//   /toncenter-testnet/<method>?<params> -> https://testnet.toncenter.com/api/v3/<method>?<params>
-//   /tonapi/<path>                    -> https://tonapi.io/<path>
-//   /tonapi-testnet/<path>            -> https://testnet.tonapi.io/<path>
+// Как задеплоить (API-токен, без интерактивного логина):
+//   1. https://dash.cloudflare.com/profile/api-tokens -> Create Token -> шаблон
+//      "Edit Cloudflare Workers" -> Create -> скопировать токен
+//   2. export CLOUDFLARE_API_TOKEN=<токен>
+//   3. cd worker && npm i && npm run deploy
+//   4. URL воркера впишите в src/utils/MyNetworkProvider.ts в PROXY_URL
+//      либо в браузере: localStorage.setItem('proxy_url', '<URL>')
 
 const TONCENTER_API_KEY = 'd843619b379084d133f061606beecbf72ae2bf60e0622e808f2a3f631673599b';
 
-const BASES = {
-  toncenter: 'https://toncenter.com/api/v3',
-  'toncenter-testnet': 'https://testnet.toncenter.com/api/v3',
-  tonapi: 'https://tonapi.io',
-  'tonapi-testnet': 'https://testnet.tonapi.io',
-};
+const ALLOWED_HOSTS = new Set([
+  'toncenter.com',
+  'testnet.toncenter.com',
+  'tonapi.io',
+  'testnet.tonapi.io',
+]);
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -44,25 +41,43 @@ export default {
     }
 
     const url = new URL(request.url);
-    const path = url.pathname; // e.g. /toncenter/account
-
-    const prefix = path.split('/')[1]; // toncenter | toncenter-testnet | tonapi | tonapi-testnet
-    const base = BASES[prefix];
-    if (!base) {
-      return new Response('Unknown proxy target: ' + prefix, { status: 404, headers: CORS });
+    if (url.pathname !== '/api/' && url.pathname !== '/api') {
+      return new Response('Not found', { status: 404, headers: CORS });
     }
 
-    const rest = path.slice(prefix.length + 2); // e.g. account | v2/blockchain/accounts/...
-    const upstream = base + '/' + rest + url.search;
+    const target = url.searchParams.get('url');
+    if (!target) {
+      return new Response(JSON.stringify({ error: 'Missing url param' }), {
+        status: 400,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let upstream;
+    try {
+      upstream = new URL(target);
+    } catch {
+      return new Response(JSON.stringify({ error: 'Bad url param' }), {
+        status: 400,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!ALLOWED_HOSTS.has(upstream.host)) {
+      return new Response(JSON.stringify({ error: 'Host not allowed: ' + upstream.host }), {
+        status: 403,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
 
     const headers = { 'Content-Type': 'application/json' };
-    if (prefix.startsWith('toncenter')) {
+    if (upstream.host.includes('toncenter')) {
       headers['X-API-Key'] = TONCENTER_API_KEY;
     }
 
     let upstreamResponse;
     try {
-      upstreamResponse = await fetch(upstream, { headers });
+      upstreamResponse = await fetch(upstream.toString(), { headers });
     } catch (e) {
       return new Response(JSON.stringify({ error: 'Upstream error: ' + (e && e.message) }), {
         status: 502,
