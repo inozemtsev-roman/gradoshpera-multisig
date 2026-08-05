@@ -1,5 +1,4 @@
 import {Address} from "@ton/core";
-import {sendToIndex} from "./MyNetworkProvider";
 
 export interface AddressInfo {
     isBounceable: boolean;
@@ -36,8 +35,7 @@ export const getAddressFormat = async (address: Address, isTestnet: boolean): Pr
 
     let friendly = localStorage.getItem('address_' + raw);
     if (!friendly) {
-        const result = await sendToIndex('addressBook', {address: raw}, isTestnet);
-        friendly = result[raw].user_friendly;
+        friendly = address.toString({bounceable: true, testOnly: isTestnet});
         localStorage.setItem('address_' + raw, friendly);
     }
 
