@@ -55,6 +55,7 @@ import {
 } from "./utils/MultisigRegistry";
 import { Order } from "./multisig/Order";
 import { JettonWallet } from "./jetton/JettonWallet";
+import { IS_TELEGRAM, initTelegram } from "./utils/telegram";
 import {
   SINGLE_NOMINATOR_POOL_OP_CHANGE_VALIDATOR_ADDRESS,
   SINGLE_NOMINATOR_POOL_OP_WITHDRAW,
@@ -79,7 +80,14 @@ const YOU_BADGE: string = ` <div class="badge">Это вы</div>`;
 
 const clearUrlState = (): void => {
   if (window.history.state !== "") {
-    window.history.pushState("", "Мультикошелек", "#");
+    if (IS_TELEGRAM) {
+      // В Telegram Mini Apps хэш занят инициализационными данными
+      // (#tgWebAppData=...) — его нельзя перезаписывать, иначе Telegram
+      // сообщит «Некорректный URL». Состояние держим в history.state.
+      window.history.pushState("", "Мультикошелек");
+    } else {
+      window.history.pushState("", "Мультикошелек", "#");
+    }
   }
 };
 
@@ -89,7 +97,11 @@ const pushUrlState = (multisigAddress: string, orderId?: bigint): void => {
     url += "/" + orderId;
   }
   if (window.history.state !== url) {
-    window.history.pushState(url, "Мультикошелек - " + url, "#" + url);
+    if (IS_TELEGRAM) {
+      window.history.pushState(url, "Мультикошелек - " + url);
+    } else {
+      window.history.pushState(url, "Мультикошелек - " + url, "#" + url);
+    }
   }
 };
 
@@ -112,6 +124,8 @@ if (IS_TESTNET) {
   $(".testnet-badge").style.display = "block";
   document.body.classList.add("testnet-padding");
 }
+
+initTelegram();
 
 export const formatContractAddress = (address: Address): string => {
   return address.toString({ bounceable: true, testOnly: IS_TESTNET });
@@ -200,6 +214,7 @@ const tonConnectUI = new TonConnectUI({
 });
 
 tonConnectUI.uiOptions = {
+  language: "ru",
   uiPreferences: {
     theme: THEME.DARK,
   },
@@ -2539,7 +2554,11 @@ const processUrl = async () => {
   clearMultisig();
   clearOrder();
 
-  const urlPostfix = window.location.hash.substring(1);
+  // В Telegram Mini Apps хэш занят инициализационными данными Telegram
+  // (#tgWebAppData=...), состояние экрана хранится в history.state.
+  const urlPostfix = IS_TELEGRAM
+    ? String(window.history.state ?? "")
+    : window.location.hash.substring(1);
 
   if (urlPostfix) {
     const { multisigAddress, orderId } = parseUrl(urlPostfix);
