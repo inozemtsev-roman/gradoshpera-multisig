@@ -9,26 +9,33 @@
 
 ## Деплой
 
-1. Установите wrangler:
+### Способ 1 — API-токен (без интерактивного логина)
 
-   ```bash
-   npm i -g wrangler
-   ```
+`wrangler login` здесь не работает (нужен браузерный OAuth). Вместо этого создайте API-токен:
 
-2. Войдите в аккаунт Cloudflare:
+1. Откройте https://dash.cloudflare.com/profile/api-tokens
+2. **Create Token** → шаблон **Edit Cloudflare Workers** → **Continue** → **Create Token**
+3. Скопируйте токен.
 
-   ```bash
-   wrangler login
-   ```
+Затем задеплойте:
 
-3. Задеплойте:
+```bash
+export CLOUDFLARE_API_TOKEN=<токен>
+cd worker
+npm i
+npm run deploy        # то же, что npx wrangler deploy
+```
 
-   ```bash
-   cd worker
-   wrangler deploy
-   ```
+### Способ 2 — интерактивный логин (на своей машине с браузером)
 
-4. Из вывода возьмите URL вида `https://<ваше-имя>.workers.dev`.
+```bash
+npm i -g wrangler
+wrangler login
+cd worker
+wrangler deploy
+```
+
+Из вывода возьмите URL вида `https://<ваше-имя>.workers.dev`.
 
 ## Подключение к мультикошельку
 
