@@ -220,6 +220,46 @@ tonConnectUI.uiOptions = {
   },
 };
 
+// Кнопка TON Connect: стандартный текст «Подключить кошелёк» не помещается на
+// экране мобильного — сокращаем его до «Кошелек». Состояние «подключено»
+// (имя кошелька, dropdown) не трогаем.
+const SHORT_BUTTON_LABELS: string[] = [
+  "Подключить кошелёк",
+  "Подключить кошелек",
+  "Connect Wallet",
+];
+
+const shortenTonConnectButton = (): void => {
+  const root = $("#tonConnectButton");
+  if (!root) return;
+
+  const apply = (): void => {
+    // В подключённом состоянии кнопка заменяется на dropdown — не меняем.
+    if (root.querySelector("[data-tc-dropdown-button]")) return;
+    const connectBtn = root.querySelector("[data-tc-connect-button]");
+    if (!connectBtn) return;
+
+    const walker = document.createTreeWalker(connectBtn, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const text = (node.textContent || "").trim();
+      if (SHORT_BUTTON_LABELS.indexOf(text) > -1) {
+        node.textContent = "Кошелек";
+      }
+    }
+  };
+
+  apply();
+  // TonConnect перерисовывает кнопку при смене статуса — следим за DOM.
+  new MutationObserver(apply).observe(root, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+};
+
+shortenTonConnectButton();
+
 const tonConnectUnsubscribe = tonConnectUI.onStatusChange((info) => {
   if (info === null) {
     // wallet disconnected
