@@ -496,6 +496,46 @@ const updateApproveButton = (
   ($("#order_approveButton") as HTMLButtonElement).disabled = isApproving;
 };
 
+const MONTHS_GENITIVE = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
+
+const formatDateRu = (date: Date): string => {
+  const offsetMin = -date.getTimezoneOffset();
+  const abs = Math.abs(offsetMin);
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const offsetStr =
+    "UTC (" +
+    sign +
+    Math.floor(abs / 60) +
+    (abs % 60 !== 0 ? ":" + String(abs % 60).padStart(2, "0") : "") +
+    ")";
+  const dateStr =
+    date.getDate() +
+    " " +
+    MONTHS_GENITIVE[date.getMonth()] +
+    " " +
+    date.getFullYear() +
+    " года";
+  const timeStr = date.toLocaleString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  return dateStr + ", " + timeStr + " " + offsetStr;
+};
+
 const renderCurrentOrderInfo = (): void => {
   const {
     tonBalance,
@@ -530,7 +570,7 @@ const renderCurrentOrderInfo = (): void => {
 
   $("#order_approvals").innerText = approvalsNum + "/" + threshold;
   $("#order_expiresAt").innerText =
-    (isExpired && !isExecuted ? "❌ ИСТЁК - " : "") + expiresAt.toString();
+    (isExpired && !isExecuted ? "❌ ИСТЁК - " : "") + formatDateRu(expiresAt);
 
   let isApprovedByMe = false;
   let signersHTML = "";
