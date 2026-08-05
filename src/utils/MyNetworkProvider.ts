@@ -531,7 +531,8 @@ export class MyNetworkProvider implements ContractProvider {
 }
 
 // tonapi GET runGetMethod принимает каждый аргумент как строку TVMStackValue:
-// int -> число строкой, cell/slice/builder -> base64 BOC.
+// int -> число строкой, cell -> base64 BOC, slice с одним адресом -> raw-адрес
+// (base64 BOC в tonapi разбирается как cell, а не slice).
 const tonApiArgFromCore = (item: TupleItem): string => {
   switch (item.type) {
     case "null":
@@ -540,8 +541,14 @@ const tonApiArgFromCore = (item: TupleItem): string => {
       return item.value.toString();
     case "cell":
       return item.cell.toBoc().toString("base64");
-    case "slice":
+    case "slice": {
+      const slice = item.cell.beginParse();
+      if (slice.remainingRefs === 0 && slice.remainingBits === 267) {
+        const address = slice.loadAddress();
+        return address.toRawString();
+      }
       return item.cell.toBoc().toString("base64");
+    }
     case "builder":
       return item.cell.toBoc().toString("base64");
     case "tuple":

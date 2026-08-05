@@ -411,7 +411,7 @@ button:disabled, .btn:disabled {
 /* DAO MULTISIGS */
 
 #daoMultisigsBlock {
-    margin-top: 20px;
+    margin-top: 0;
     max-width: 700px;
     width: 100%;
 }
@@ -444,4 +444,17 @@ button:disabled, .btn:disabled {
 
 #daoMultisigsRefresh {
     align-self: flex-start;
+}
+
+.daoBalance {
+    white-space: nowrap;
+}
+
+.daoBalanceLogo {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 4px;
 }

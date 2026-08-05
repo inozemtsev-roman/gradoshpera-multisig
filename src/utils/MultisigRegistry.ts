@@ -1,11 +1,21 @@
 import { Address, Cell } from "@ton/core";
+import { JettonMinter } from "../jetton/JettonMinter";
+import { JettonWallet } from "../jetton/JettonWallet";
 import { parseMultisigData } from "../multisig/Multisig";
-import { getProxyUrl, sendToIndex } from "./MyNetworkProvider";
+import { getProxyUrl, MyNetworkProvider, sendToIndex } from "./MyNetworkProvider";
+
+export interface RegistryJetton {
+  name: string;
+  address: string;
+  decimals?: number;
+  logo?: string;
+}
 
 export interface RegistryEntry {
   name: string;
   address: string;
   testnet: boolean;
+  jetton?: RegistryJetton;
 }
 
 export interface RegistryFile {
@@ -44,6 +54,12 @@ const SNAPSHOT: RegistryFile = {
     {
       name: "ДАО Градосфера",
       address: "EQAbRLmFnI7y5BUmSVvxsz3X4Ejy50uMkgvXPmevthl5K3n9",
+      jetton: {
+        name: "Благо",
+        address: "EQBlaryI1HCY6hIlW9giBoqKGtuMHfxlULZOhD6UyzpqLcll",
+        decimals: 0,
+        logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/main/logo.png",
+      },
     },
   ],
 };
@@ -110,13 +126,30 @@ const normalizeEntries = (file: RegistryFile): RegistryEntry[] =>
     name: e.name,
     address: e.address,
     testnet: e.testnet ?? file.testnet ?? false,
+    jetton: e.jetton,
   }));
+
+// Если в удалённом реестре нет данных о жетоне, подтягиваем из снапшота.
+const enrichJettons = (entries: RegistryEntry[]): RegistryEntry[] => {
+  const snapshotJettons = new Map<string, RegistryJetton>();
+  for (const e of SNAPSHOT.multisigs) {
+    if (e.jetton) snapshotJettons.set(rawOf(e.address), e.jetton);
+  }
+  return entries.map((e) => {
+    if (e.jetton) return e;
+    const jetton = snapshotJettons.get(rawOf(e.address));
+    return jetton ? { ...e, jetton } : e;
+  });
+};
+
+const finalizeEntries = (file: RegistryFile): RegistryEntry[] =>
+  enrichJettons(normalizeEntries(file));
 
 // Реестр мультикошельков ДАО: прямой raw.githubusercontent.com -> прокси -> снапшот.
 export const fetchRegistry = async (force = false): Promise<RegistryEntry[]> => {
   if (!force) {
     const cached = loadRegistryCache();
-    if (cached) return normalizeEntries(cached);
+    if (cached) return finalizeEntries(cached);
   }
 
   const errors: string[] = [];
@@ -125,7 +158,7 @@ export const fetchRegistry = async (force = false): Promise<RegistryEntry[]> => 
     const json = await fetchJson(REGISTRY_URL, FETCH_TIMEOUT_MS);
     if (!isValidRegistryFile(json)) throw new Error("Invalid format");
     saveRegistryCache(json);
-    return normalizeEntries(json);
+    return finalizeEntries(json);
   } catch (e: any) {
     errors.push("raw: " + (e?.message || e));
   }
@@ -139,13 +172,13 @@ export const fetchRegistry = async (force = false): Promise<RegistryEntry[]> => 
       );
       if (!isValidRegistryFile(json)) throw new Error("Invalid format");
       saveRegistryCache(json);
-      return normalizeEntries(json);
+      return finalizeEntries(json);
     }
   } catch (e: any) {
     errors.push("proxy: " + (e?.message || e));
   }
 
-  return normalizeEntries(SNAPSHOT);
+  return finalizeEntries(SNAPSHOT);
 };
 
 export const getRole = (
@@ -210,6 +243,30 @@ export const fetchMultisigStatus = async (
       role: "none",
       error: e?.message || "Ошибка проверки",
     };
+  }
+};
+
+// Баланс жетона ДАО на кошельке мультикошелька (в минимальных единицах жетона).
+export const fetchJettonBalance = async (
+  jettonAddress: string,
+  ownerAddress: string,
+  isTestnet: boolean,
+): Promise<string> => {
+  try {
+    const minter = JettonMinter.createFromAddress(
+      Address.parseFriendly(jettonAddress).address,
+    );
+    const provider = new MyNetworkProvider(minter.address, isTestnet);
+    const walletAddress = await minter.getWalletAddress(
+      provider,
+      Address.parseFriendly(ownerAddress).address,
+    );
+    const wallet = JettonWallet.createFromAddress(walletAddress);
+    const data = await wallet.getWalletData(provider);
+    return String(data.balance);
+  } catch (e: any) {
+    console.warn("fetchJettonBalance failed:", e);
+    return "";
   }
 };
 
