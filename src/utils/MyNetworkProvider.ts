@@ -16,6 +16,10 @@ import {TonClient} from "@ton/ton";
 
 const API_KEY = 'd843619b379084d133f061606beecbf72ae2bf60e0622e808f2a3f631673599b';
 
+// Прокси на Cloudflare Worker (см. worker/worker.js). Пусто = прокси отключён.
+// Также можно задать через localStorage.setItem('proxy_url', 'https://...') без пересборки.
+const PROXY_URL = '';
+
 const PROVIDER_TIMEOUT_MS = 5000;
 const CACHE_TTL_MS = 10000;
 const COOLDOWN_MS = 30000;
@@ -27,6 +31,15 @@ type IndexQueryValue = IndexQueryPrimitive | IndexQueryPrimitive[];
 interface Provider {
     key: string;
     call: (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean) => Promise<any>;
+}
+
+const getProxyUrl = (): string => {
+    try {
+        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('proxy_url') : null;
+        return (stored || PROXY_URL).replace(/\/+$/, '');
+    } catch {
+        return PROXY_URL.replace(/\/+$/, '');
+    }
 }
 
 const isHex = (s: string): boolean => /^[0-9a-fA-F]+$/.test(s) && s.length % 2 === 0;
@@ -89,10 +102,9 @@ const buildQueryString = (params: Record<string, IndexQueryValue>): string => {
     return query.toString();
 }
 
-const callToncenter = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
-    const rpc = toncenterEndpoint(isTestnet);
+const callToncenter = async (base: string, method: string, params: Record<string, IndexQueryValue>): Promise<any> => {
     const query = buildQueryString(params);
-    return fetchWithTimeout(rpc + method + '?' + query, {
+    return fetchWithTimeout(base + method + '?' + query, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -184,8 +196,8 @@ const mapWithConcurrency = async <T, R>(items: T[], concurrency: number, fn: (it
     return results;
 }
 
-const callTonapi = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
-    const rpc = tonapiEndpoint(isTestnet);
+const callTonapi = async (base: string, method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
+    const rpc = base;
 
     switch (method) {
         case 'account': {
@@ -206,7 +218,7 @@ const callTonapi = async (method: string, params: Record<string, IndexQueryValue
         case 'transactions': {
             const address = encodeURIComponent(String(params.account));
             const limit = params.limit != null ? String(params.limit) : '256';
-            const json = await fetchWithTimeout(rpc + 'accounts/' + address + '/transactions?limit=' + limit, {
+            const json = await fetchWithTimeout(rpc + 'blockchain/accounts/' + address + '/transactions?limit=' + limit, {
                 method: 'GET'
             }, PROVIDER_TIMEOUT_MS);
             return {transactions: (json.transactions || []).map(tonapiTxToCanonical)};
@@ -234,24 +246,41 @@ const callTonapi = async (method: string, params: Record<string, IndexQueryValue
     }
 }
 
-const providersForMethod: Record<string, Provider[]> = {
-    account: [
-        {key: 'toncenter', call: callToncenter},
-        {key: 'tonapi', call: callTonapi},
-    ],
-    transactions: [
-        {key: 'toncenter', call: callToncenter},
-        {key: 'tonapi', call: callTonapi},
-    ],
-    traces: [
-        {key: 'toncenter', call: callToncenter},
-        {key: 'tonapi', call: callTonapi},
-    ],
-    addressBook: [
-        {key: 'toncenter', call: callToncenter},
-        {key: 'tonapi', call: callTonapi},
-    ],
-};
+const callTonapiViaProxy = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
+    const proxy = getProxyUrl();
+    const base = proxy + (isTestnet ? '/tonapi-testnet/v2/' : '/tonapi/v2/');
+    return callTonapi(base, method, params, isTestnet);
+}
+
+const callToncenterViaProxy = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
+    const proxy = getProxyUrl();
+    const base = proxy + (isTestnet ? '/toncenter-testnet/' : '/toncenter/');
+    return callToncenter(base, method, params);
+}
+
+const callToncenterDirect = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
+    return callToncenter(toncenterEndpoint(isTestnet), method, params);
+}
+
+const callTonapiDirect = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean): Promise<any> => {
+    return callTonapi(tonapiEndpoint(isTestnet), method, params, isTestnet);
+}
+
+const providersForMethod = (method: string): Provider[] => {
+    const proxy = getProxyUrl();
+    const list: Provider[] = [];
+
+    // Если прокси задан — сначала пробуем его (он разблокирует заблокированную сеть)
+    if (proxy) {
+        list.push({key: 'proxy-toncenter', call: callToncenterViaProxy});
+        list.push({key: 'proxy-tonapi', call: callTonapiViaProxy});
+    }
+
+    list.push({key: 'toncenter', call: callToncenterDirect});
+    list.push({key: 'tonapi', call: callTonapiDirect});
+
+    return list;
+}
 
 const cacheableMethods = new Set(['account', 'transactions', 'addressBook']);
 
@@ -259,8 +288,8 @@ const responseCache: Map<string, {time: number, data: any}> = new Map();
 const providerCooldown: Map<string, number> = new Map();
 
 export const sendToIndex = async (method: string, params: Record<string, IndexQueryValue>, isTestnet: boolean) => {
-    const providers = providersForMethod[method];
-    if (!providers) {
+    const providers = providersForMethod(method);
+    if (providers.length === 0) {
         throw new Error('Не поддерживаемый метод: ' + method);
     }
 
@@ -274,6 +303,7 @@ export const sendToIndex = async (method: string, params: Record<string, IndexQu
         }
     }
 
+    const errors: string[] = [];
     let lastError: any = null;
 
     for (const provider of providers) {
@@ -289,9 +319,10 @@ export const sendToIndex = async (method: string, params: Record<string, IndexQu
                 responseCache.set(cacheKey, {time: Date.now(), data});
             }
             return data;
-        } catch (e) {
+        } catch (e: any) {
             console.warn(`Provider ${provider.key} failed for method ${method}:`, e);
             providerCooldown.set(provider.key, Date.now() + COOLDOWN_MS);
+            errors.push(`${provider.key}: ${e?.message || e}`);
             lastError = e;
         }
     }
@@ -300,7 +331,7 @@ export const sendToIndex = async (method: string, params: Record<string, IndexQu
         throw lastError;
     }
 
-    throw new Error('Timeout: все источники данных временно недоступны. Попробуйте позже.');
+    throw new Error('Timeout: все источники данных временно недоступны. Попробуйте позже. (' + errors.join('; ') + ')');
 }
 
 export class MyNetworkProvider implements ContractProvider {
@@ -323,16 +354,38 @@ export class MyNetworkProvider implements ContractProvider {
     }
 
     async get(name: string, args: TupleItem[]): Promise<ContractGetMethodResult> {
+        const errors: string[] = [];
+
         try {
             return await this.tonClient.runMethod(this.contractAddress, name, args);
-        } catch (e) {
-            console.warn('toncenter v2 get-method failed, falling back to tonapi:', e);
-            return this.getFromTonApi(name, args);
+        } catch (e: any) {
+            errors.push(`toncenter-v2: ${e?.message || e}`);
+            console.warn('toncenter v2 get-method failed:', e);
         }
+
+        // Прокси (разблокированная сеть) -> прямой tonapi
+        const proxy = getProxyUrl();
+        if (proxy) {
+            try {
+                const base = proxy + (this.isTestnet ? '/tonapi-testnet/v2/' : '/tonapi/v2/');
+                return await this.getFromTonApiAt(base, name, args);
+            } catch (e: any) {
+                errors.push(`proxy-tonapi: ${e?.message || e}`);
+                console.warn('proxy tonapi get-method failed:', e);
+            }
+        }
+
+        try {
+            return await this.getFromTonApiAt(tonapiEndpoint(this.isTestnet), name, args);
+        } catch (e: any) {
+            errors.push(`tonapi: ${e?.message || e}`);
+            console.warn('tonapi get-method failed:', e);
+        }
+
+        throw new Error('Timeout: не удалось выполнить get-метод контракта. (' + errors.join('; ') + ')');
     }
 
-    private async getFromTonApi(name: string, args: TupleItem[]): Promise<ContractGetMethodResult> {
-        const rpc = tonapiEndpoint(this.isTestnet);
+    private async getFromTonApiAt(rpc: string, name: string, args: TupleItem[]): Promise<ContractGetMethodResult> {
         const address = this.contractAddress.toRawString();
         const url = rpc + 'blockchain/accounts/' + encodeURIComponent(address) + '/methods/' + encodeURIComponent(name);
         const query = new URLSearchParams();
