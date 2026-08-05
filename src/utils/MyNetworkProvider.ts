@@ -312,6 +312,15 @@ const callTonapiWithFetcher = async (
       const json = await fetcher(rpc + "accounts/" + encodeURIComponent(raw));
       return { [raw]: { user_friendly: json.address } };
     }
+    case "jettonBalance": {
+      const account = encodeURIComponent(String(params.account));
+      const jettonRaw = String(params.jetton);
+      const json = await fetcher(rpc + "accounts/" + account + "/jettons");
+      const entry = (json.balances || []).find(
+        (b: any) => b.jetton?.address === jettonRaw,
+      );
+      return { balance: entry ? String(entry.balance) : "0" };
+    }
     default:
       throw new Error("Не поддерживаемый метод: " + method);
   }
@@ -360,7 +369,12 @@ const providersForMethod = (method: string): Provider[] => {
   return list;
 };
 
-const cacheableMethods = new Set(["account", "transactions", "addressBook"]);
+const cacheableMethods = new Set([
+  "account",
+  "transactions",
+  "addressBook",
+  "jettonBalance",
+]);
 
 const responseCache: Map<string, { time: number; data: any }> = new Map();
 const providerCooldown: Map<string, number> = new Map();
