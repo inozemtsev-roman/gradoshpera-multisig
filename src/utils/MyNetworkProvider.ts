@@ -489,7 +489,7 @@ export class MyNetworkProvider implements ContractProvider {
       encodeURIComponent(name);
     const query = new URLSearchParams();
     for (const arg of args) {
-      query.append("args", JSON.stringify(tonApiArgFromCore(arg)));
+      query.append("args", tonApiArgFromCore(arg));
     }
 
     const json = await fetcher(url + "?" + query.toString());
@@ -530,23 +530,47 @@ export class MyNetworkProvider implements ContractProvider {
   }
 }
 
-const tonApiArgFromCore = (item: TupleItem): any => {
+// tonapi GET runGetMethod принимает каждый аргумент как строку TVMStackValue:
+// int -> число строкой, cell/slice/builder -> base64 BOC.
+const tonApiArgFromCore = (item: TupleItem): string => {
   switch (item.type) {
     case "null":
-      return { type: "null" };
+      return "null";
     case "int":
-      return { type: "int", num: item.value.toString() };
+      return item.value.toString();
     case "cell":
-      return { type: "cell", cell: item.cell.toBoc().toString("base64") };
+      return item.cell.toBoc().toString("base64");
     case "slice":
-      return { type: "slice", slice: item.cell.toBoc().toString("base64") };
+      return item.cell.toBoc().toString("base64");
     case "builder":
-      return { type: "cell", cell: item.cell.toBoc().toString("base64") };
+      return item.cell.toBoc().toString("base64");
     case "tuple":
-      return { type: "tuple", tuple: item.items.map(tonApiArgFromCore) };
+      return JSON.stringify({
+        type: "tuple",
+        tuple: item.items.map(tonApiArgFromCore),
+      });
     default:
       throw new Error("Неподдерживаемый тип аргумента: " + (item as any).type);
   }
+};
+
+// tonapi в стеке get-методов отдаёт ячейки в HEX (не base64).
+const cellFromTonapiString = (s: string): Cell => {
+  if (!s) throw new Error("Пустая ячейка в ответе tonapi");
+  if (isHex(s)) return Cell.fromBoc(Buffer.from(s, "hex"))[0];
+  return Cell.fromBase64(s);
+};
+
+// BigInt('-0x1') кидает исключение — разбираем знак вручную.
+const numToBigInt = (s: string): bigint => {
+  let str = String(s);
+  let neg = false;
+  if (str.startsWith("-")) {
+    neg = true;
+    str = str.slice(1);
+  }
+  const v = BigInt(str);
+  return neg ? -v : v;
 };
 
 const tonApiStackToCore = (item: any): TupleItem => {
@@ -554,15 +578,16 @@ const tonApiStackToCore = (item: any): TupleItem => {
     case "null":
       return { type: "null" };
     case "int":
-      return { type: "int", value: BigInt(item.num) };
+    case "num":
+      return { type: "int", value: numToBigInt(item.num) };
     case "cell":
-      return { type: "cell", cell: Cell.fromBase64(item.cell) };
+      return { type: "cell", cell: cellFromTonapiString(item.cell) };
     case "slice":
-      return { type: "slice", cell: Cell.fromBase64(item.slice) };
+      return { type: "slice", cell: cellFromTonapiString(item.slice) };
     case "builder":
       return {
         type: "builder",
-        cell: Cell.fromBase64(item.cell || item.builder),
+        cell: cellFromTonapiString(item.cell || item.builder),
       };
     case "tuple":
       return {
