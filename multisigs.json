@@ -3,7 +3,13 @@
   "multisigs": [
     {
       "name": "ДАО Градосфера",
-      "address": "EQAbRLmFnI7y5BUmSVvxsz3X4Ejy50uMkgvXPmevthl5K3n9"
+      "address": "EQAbRLmFnI7y5BUmSVvxsz3X4Ejy50uMkgvXPmevthl5K3n9",
+      "jetton": {
+        "name": "Благо",
+        "address": "EQBlaryI1HCY6hIlW9giBoqKGtuMHfxlULZOhD6UyzpqLcll",
+        "decimals": 0,
+        "logo": "https://raw.githubusercontent.com/gradosphera/brand-assets/main/logo.png"
+      }
     }
   ]
 }
