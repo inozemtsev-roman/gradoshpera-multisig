@@ -73,7 +73,7 @@ const fetchJson = async (url: string, timeoutMs: number): Promise<any> => {
   } catch (e: any) {
     if (controller.signal.aborted) {
       throw new Error(
-        "Timeout: сервер не отвечает. Проверьте интернет-соединение.",
+        "Timeout: сервер не отвечает. Проверьте интернет-соединение. Подождите 30 секунд и нажмите кнопку.",
       );
     }
     throw e;

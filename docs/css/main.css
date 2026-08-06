@@ -291,6 +291,31 @@ button:disabled, .btn:disabled {
 
 #multisig_error {
     color: var(--error);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.errorRefreshNote {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.errorRefreshButton {
+    border: 1px solid var(--link-color);
+    color: var(--link-color);
+    background: transparent;
+    border-radius: 40px;
+    padding: 8px 20px;
+    font-size: 15px;
+    line-height: 20px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.errorRefreshButton:hover {
+    color: var(--text-color);
+    border-color: var(--text-color);
 }
 
 .error {
@@ -317,6 +342,9 @@ button:disabled, .btn:disabled {
 
 #order_error {
     color: var(--error);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
 }
 
 

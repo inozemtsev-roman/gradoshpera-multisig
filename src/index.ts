@@ -76,6 +76,28 @@ const toggle = (element: HTMLElement, isVisible: boolean): void => {
 
 const YOU_BADGE: string = ` <div class="badge">Это вы</div>`;
 
+// УВЕДОМЛЕНИЯ ОБ ОШИБКАХ
+
+const ERROR_REFRESH_NOTE: string =
+  "Подождите 30 секунд и нажмите кнопку.";
+
+// Показывает уведомление об ошибке (таймаут сети, сбой API и т.п.)
+// с подсказкой и кнопкой «Обновить», перезагружающей страницу.
+const showErrorNotification = (container: HTMLElement, message: string): void => {
+  // Тексты таймаутов уже содержат подсказку — не дублируем её.
+  const hasNote = message.indexOf("Подождите 30 секунд") > -1;
+  let html = `<div>${sanitizeHTML(message)}</div>`;
+  if (!hasNote) {
+    html += `<div class="errorRefreshNote">${ERROR_REFRESH_NOTE}</div>`;
+  }
+  html += `<button type="button" class="errorRefreshButton">Обновить</button>`;
+  container.innerHTML = html;
+  const button = container.querySelector(".errorRefreshButton");
+  if (button) {
+    button.addEventListener("click", () => window.location.reload());
+  }
+};
+
 // URL STATE
 
 const clearUrlState = (): void => {
@@ -496,7 +518,7 @@ const updateMultisig = async (
     if (isFirst || !e?.message?.startsWith("Timeout")) {
       toggle($("#multisig_content"), false);
       toggle($("#multisig_error"), true);
-      $("#multisig_error").innerText = e.message;
+      showErrorNotification($("#multisig_error"), e.message);
     }
   }
 
@@ -985,7 +1007,7 @@ const updateOrder = async (
     if (isFirstTime || !e?.message?.startsWith("Timeout")) {
       toggle($("#order_content"), false);
       toggle($("#order_error"), true);
-      $("#order_error").innerText = e.message;
+      showErrorNotification($("#order_error"), e.message);
     }
   }
 

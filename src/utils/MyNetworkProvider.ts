@@ -99,7 +99,7 @@ const fetchWithTimeout = async (
   } catch (e: any) {
     if (controller.signal.aborted) {
       throw new Error(
-        "Timeout: сервер API не отвечает. Проверьте интернет-соединение.",
+        "Timeout: сервер API не отвечает. Проверьте интернет-соединение. Подождите 30 секунд и нажмите кнопку.",
       );
     }
     throw e;
@@ -430,7 +430,7 @@ export const sendToIndex = async (
   throw new Error(
     "Timeout: все источники данных временно недоступны. Попробуйте позже. (" +
       errors.join("; ") +
-      ")",
+      "). Подождите 30 секунд и нажмите кнопку.",
   );
 };
 
@@ -485,7 +485,7 @@ export class MyNetworkProvider implements ContractProvider {
     throw new Error(
       "Timeout: не удалось выполнить get-метод контракта. (" +
         errors.join("; ") +
-        ")",
+        "). Подождите 30 секунд и нажмите кнопку.",
     );
   }
 
