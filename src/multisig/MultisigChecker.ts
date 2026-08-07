@@ -14,6 +14,11 @@ import { checkMultisigOrder, MultisigOrderInfo } from "./MultisigOrderChecker";
 
 const TRACE_BATCH_SIZE = 50;
 
+// Сколько последних заявок обогащать деталями (get-методы, трассы выполнения).
+// Остальные заявки в списке показываются без деталей, чтобы не создавать лишние
+// запросы к API и не ловить rate limit.
+const MAX_ORDER_DETAILS = 10;
+
 interface ToncenterMessage {
   decoded_opcode?: string | null;
   opcode?: string | number | null;
@@ -340,18 +345,27 @@ export const checkMultisig = async (
   let lastOrders: LastOrder[] = [];
 
   if (lastOrdersMode !== "none") {
-    const result = await sendToIndex(
-      "transactions",
-      { account: addressToString(multisigAddress), limit: 256 },
-      isTestnet,
-    );
+    try {
+      const result = await sendToIndex(
+        "transactions",
+        { account: addressToString(multisigAddress), limit: 256 },
+        isTestnet,
+      );
 
     for (const tx of result.transactions) {
       if (!tx.in_msg.message_content) continue;
       if (!tx.in_msg.message_content.body) continue;
 
-      const inBody = Cell.fromBase64(tx.in_msg.message_content.body);
-      const inBodySlice = inBody.beginParse();
+      let inBody: Cell;
+      let inBodySlice: any;
+      try {
+        inBody = Cell.fromBase64(tx.in_msg.message_content.body);
+        inBodySlice = inBody.beginParse();
+      } catch (e) {
+        // Тело входящего сообщения — не BOC (текстовый комментарий, пустой
+        // комментарий или отличный формат). Пропускаем такую транзакцию.
+        continue;
+      }
       if (inBodySlice.remainingBits < 32) {
         continue;
       }
@@ -488,9 +502,22 @@ export const checkMultisig = async (
         }
       }
 
-      lastOrders = Object.values(lastOrdersMap);
+      lastOrders = Object.values(lastOrdersMap).sort((a, b) => {
+        if (a.type === b.type) {
+          return b.utime - a.utime;
+        } else {
+          if (a.type === "pending") return -1;
+          return 1;
+        }
+      });
 
-      const executedOrders = lastOrders.filter(
+      // Детали (get-методы заявок и трассы исполнения) запрашиваем только для
+      // нескольких последних заявок, чтобы не создавать десятки запросов
+      // каждые несколько секунд и не ловить rate limit. Остальные заявки
+      // показываются в списке без деталей.
+      const detailOrders = lastOrders.slice(0, MAX_ORDER_DETAILS);
+
+      const executedOrders = detailOrders.filter(
         (lastOrder) => lastOrder.type === "executed",
       );
       const transactionHashes = [
@@ -570,7 +597,7 @@ export const checkMultisig = async (
 
       const getOrderInfoPromises: Promise<void>[] = [];
 
-      for (const lastOrder of lastOrders) {
+      for (const lastOrder of detailOrders) {
         getOrderInfoPromises.push(getOrderInfo(lastOrder));
       }
 
@@ -595,15 +622,12 @@ export const checkMultisig = async (
           lastOrder.executionStatus = "success";
         }
       }
-
-      lastOrders = lastOrders.sort((a, b) => {
-        if (a.type === b.type) {
-          return b.utime - a.utime;
-        } else {
-          if (a.type === "pending") return -1;
-          return 1;
-        }
-      });
+      }
+    } catch (e) {
+      // Список заявок — некритичная часть страницы. Если его не удалось
+      // загрузить (rate limit, ошибка API), показываем мультикошелек без списка.
+      console.error("Failed to load last orders:", e);
+      lastOrders = [];
     }
   }
 

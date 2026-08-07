@@ -374,6 +374,7 @@ const cacheableMethods = new Set([
   "transactions",
   "addressBook",
   "jettonBalance",
+  "traces",
 ]);
 
 const responseCache: Map<string, { time: number; data: any }> = new Map();

@@ -342,9 +342,13 @@ let currentMultisigAddress: string | undefined = undefined;
 let currentMultisigInfo: MultisigInfo | undefined = undefined;
 let updateMultisigTimeoutId: any = -1;
 
+const ORDERS_PAGE_SIZE = 10;
+let lastOrdersOffset = 0;
+
 const clearMultisig = (): void => {
   currentMultisigAddress = undefined;
   currentMultisigInfo = undefined;
+  lastOrdersOffset = 0;
   clearTimeout(updateMultisigTimeoutId);
 };
 
@@ -452,11 +456,15 @@ const renderCurrentMultisigInfo = (): void => {
         : formatOrderType(lastOrder);
       let text = `<span class="orderListItem_title">${actionText} #${lastOrder.order.id}</span>`;
 
-      if (lastOrder.type === "pending" && !isExpired) {
+      if (lastOrder.type === "pending" && !isExpired && lastOrder.orderInfo) {
         text += ` — ${lastOrder.orderInfo.approvalsNum}/${lastOrder.orderInfo.threshold}`;
       }
 
-      if (lastOrder.type === "pending" && myAddress) {
+      if (
+        lastOrder.type === "pending" &&
+        myAddress &&
+        lastOrder.orderInfo
+      ) {
         const myIndex = lastOrder.orderInfo.signers.findIndex((signer) =>
           signer.address.equals(myAddress),
         );
@@ -484,7 +492,12 @@ const renderCurrentMultisigInfo = (): void => {
   let wasPending = false;
   let wasExecuted = false;
 
-  for (const lastOrder of lastOrders) {
+  const pageOrders = lastOrders.slice(
+    lastOrdersOffset,
+    lastOrdersOffset + ORDERS_PAGE_SIZE,
+  );
+
+  for (const lastOrder of pageOrders) {
     if (lastOrder.type == "executed") {
       if (!wasExecuted) {
         lastOrdersHTML += '<div class="label">Старые заявки:</div>';
@@ -500,7 +513,32 @@ const renderCurrentMultisigInfo = (): void => {
     lastOrdersHTML += formatOrder(lastOrder);
   }
 
+  if (lastOrdersOffset > 0) {
+    lastOrdersHTML +=
+      '<button class="lastOrdersPageButton" id="lastOrdersBackButton">Назад</button>';
+  }
+  if (lastOrdersOffset + ORDERS_PAGE_SIZE < lastOrders.length) {
+    lastOrdersHTML +=
+      '<button class="lastOrdersPageButton" id="lastOrdersMoreButton">Далее</button>';
+  }
+
   $("#mainScreen_ordersList").innerHTML = lastOrdersHTML;
+
+  const lastOrdersBackButton = $("#lastOrdersBackButton");
+  if (lastOrdersBackButton) {
+    lastOrdersBackButton.addEventListener("click", () => {
+      lastOrdersOffset = Math.max(0, lastOrdersOffset - ORDERS_PAGE_SIZE);
+      renderCurrentMultisigInfo();
+    });
+  }
+
+  const lastOrdersMoreButton = $("#lastOrdersMoreButton");
+  if (lastOrdersMoreButton) {
+    lastOrdersMoreButton.addEventListener("click", () => {
+      lastOrdersOffset += ORDERS_PAGE_SIZE;
+      renderCurrentMultisigInfo();
+    });
+  }
 
   $$(".multisig_lastOrder").forEach((div) => {
     div.addEventListener("click", (e) => {

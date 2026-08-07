@@ -394,6 +394,25 @@ button:disabled, .btn:disabled {
     cursor: pointer;
 }
 
+.lastOrdersPageButton {
+    border: 1px solid var(--link-color);
+    color: var(--link-color);
+    background: transparent;
+    border-radius: 40px;
+    padding: 8px 20px;
+    font-size: 15px;
+    line-height: 20px;
+    cursor: pointer;
+    margin-top: 12px;
+    margin-right: 10px;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.lastOrdersPageButton:hover {
+    color: var(--text-color);
+    border-color: var(--text-color);
+}
+
 /* ORDER SCREEN */
 
 #orderScreen {
