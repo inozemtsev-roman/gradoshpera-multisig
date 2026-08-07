@@ -287,6 +287,54 @@ button:disabled, .btn:disabled {
     overflow-wrap: anywhere;
 }
 
+/* Скелетон загрузки карточки адреса мультикошелька: мигающий размытый элемент */
+
+.multisigCardSkeleton {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    border-radius: 13px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    margin-bottom: 20px;
+    filter: blur(7px);
+    animation: skeletonBlink 1.3s ease-in-out infinite;
+}
+
+@keyframes skeletonBlink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+.skeletonAvatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: var(--border-color);
+}
+
+.skeletonLine {
+    height: 14px;
+    border-radius: 7px;
+    background-color: var(--border-color);
+}
+
+.skeletonLineName {
+    width: 55%;
+}
+
+.skeletonLineAddress {
+    width: 82%;
+}
+
+.skeletonLineBalances {
+    width: 64%;
+}
+
 #multisig_content {
     flex-direction: column;
 }
@@ -392,6 +440,25 @@ button:disabled, .btn:disabled {
 
 .multisig_lastOrder {
     cursor: pointer;
+}
+
+.lastOrdersPageButton {
+    border: 1px solid var(--link-color);
+    color: var(--link-color);
+    background: transparent;
+    border-radius: 40px;
+    padding: 8px 20px;
+    font-size: 15px;
+    line-height: 20px;
+    cursor: pointer;
+    margin-top: 12px;
+    margin-right: 10px;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.lastOrdersPageButton:hover {
+    color: var(--text-color);
+    border-color: var(--text-color);
 }
 
 /* ORDER SCREEN */

@@ -18,7 +18,11 @@ import {
 import { cellToArray, endParse } from "./Multisig";
 import { Order, parseOrderData } from "./Order";
 import { MultisigInfo } from "./MultisigChecker";
-import { MyNetworkProvider, sendToIndex } from "../utils/MyNetworkProvider";
+import {
+  MyNetworkProvider,
+  parseCellFromStateString,
+  sendToIndex,
+} from "../utils/MyNetworkProvider";
 import {
   intToLockType,
   JettonMinter,
@@ -73,13 +77,13 @@ export const checkMultisigOrder = async (
   );
 
   assert(
-    Cell.fromBase64(result.code).equals(multisigOrderCode),
+    parseCellFromStateString(result.code, "code").equals(multisigOrderCode),
     "Код контракта НЕ совпадает с кодом заявки мультикошелька из этого репозитория",
   );
 
   const tonBalance = result.balance;
 
-  const data = Cell.fromBase64(result.data);
+  const data = parseCellFromStateString(result.data, "data");
   const parsedData = parseOrderData(data);
 
   checkNumber(parsedData.threshold);

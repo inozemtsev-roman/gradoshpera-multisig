@@ -67,6 +67,27 @@ const hexToBase64IfNeeded = (s?: string | null): string => {
   return s;
 };
 
+// Разбирает ячейку из строки состояния аккаунта (tonapi отдаёт hex, toncenter — base64).
+// Пустая/частичная строка бывает у только что развёрнутого контракта.
+export const parseCellFromStateString = (
+  s?: string | null,
+  what = "данные контракта",
+): Cell => {
+  const normalized = hexToBase64IfNeeded(s);
+  if (!normalized) {
+    throw new Error(
+      `Данные контракта ещё не развёрнуты (пустое поле "${what}"). Если контракт создан только что — обновите страницу через ~30 секунд.`,
+    );
+  }
+  try {
+    return Cell.fromBase64(normalized);
+  } catch {
+    throw new Error(
+      `Некорректное поле "${what}" в состоянии контракта (не удалось разобрать ячейку). Обновите страницу или попробуйте позже.`,
+    );
+  }
+};
+
 const toncenterEndpoint = (isTestnet: boolean) =>
   isTestnet
     ? "https://testnet.toncenter.com/api/v3/"
@@ -88,7 +109,13 @@ const fetchWithTimeout = async (
       ...options,
       signal: controller.signal,
     });
-    const json = await response.json();
+    const text = await response.text();
+    let json: any = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch (e) {
+      json = null;
+    }
     if (!response.ok) {
       throw new Error(json?.error || "HTTP " + response.status);
     }
@@ -278,8 +305,10 @@ const callTonapiWithFetcher = async (
       return {
         status: json.status,
         balance: String(json.balance),
-        code: json.code,
-        data: json.data,
+        // tonapi отдаёт code/data ячейки в HEX, а не base64 BOC —
+        // нормализуем в base64 BOC, чтобы парсинг работал как для toncenter.
+        code: hexToBase64IfNeeded(json.code),
+        data: hexToBase64IfNeeded(json.data),
       };
     }
     case "transactions": {
@@ -374,6 +403,7 @@ const cacheableMethods = new Set([
   "transactions",
   "addressBook",
   "jettonBalance",
+  "traces",
 ]);
 
 const responseCache: Map<string, { time: number; data: any }> = new Map();
