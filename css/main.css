@@ -269,6 +269,24 @@ button:disabled, .btn:disabled {
 #multisigScreen {
 }
 
+.multisigCard {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    border-radius: 13px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    margin-bottom: 20px;
+}
+
+.multisigCard .daoMultisigAddress {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
 #multisig_content {
     flex-direction: column;
 }
@@ -316,6 +334,56 @@ button:disabled, .btn:disabled {
 .errorRefreshButton:hover {
     color: var(--text-color);
     border-color: var(--text-color);
+}
+
+/* Порог: линейная диаграмма */
+
+#multisig_thresholdChart {
+    margin-bottom: 10px;
+}
+
+.thresholdBarWrap {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.thresholdBar {
+    display: flex;
+    border-radius: 13px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.thresholdBarSeg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 18px 8px;
+}
+
+.thresholdBarThreshold {
+    background-color: rgba(0, 136, 204, 0.28);
+    border-right: 1px solid var(--border-color);
+}
+
+.thresholdBarSigners {
+    background-color: rgba(46, 204, 113, 0.28);
+}
+
+.thresholdBarCount {
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.thresholdBarCaption {
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
 }
 
 .error {

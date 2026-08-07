@@ -348,10 +348,39 @@ const clearMultisig = (): void => {
   clearTimeout(updateMultisigTimeoutId);
 };
 
+// Линейная диаграмма порога: длинный прямоугольник со скруглёнными краями в стиле
+// карточки адреса мультикошелька; левая часть — порог (threshold), правая — число
+// подтверждающих (signers); ширина каждой части пропорциональна соответствующему
+// числу; внутри каждой части крупным жирным шрифтом — количество из порога.
+
+const renderThresholdChart = (): void => {
+  const container = $("#multisig_thresholdChart");
+  if (!container || !currentMultisigInfo) return;
+
+  const { threshold, signers } = currentMultisigInfo;
+
+  const total = threshold + signers.length;
+  const thresholdPct = total > 0 ? (threshold / total) * 100 : 50;
+  const signersPct = total > 0 ? (signers.length / total) * 100 : 50;
+
+  container.innerHTML = `
+    <div class="thresholdBarWrap">
+      <div class="thresholdBar" role="img" aria-label="Порог и число подтверждающих">
+        <div class="thresholdBarSeg thresholdBarThreshold" style="flex-grow:${thresholdPct};flex-basis:0;flex-shrink:0">
+          <span class="thresholdBarCount">${threshold}</span>
+          <span class="thresholdBarCaption">Порог</span>
+        </div>
+        <div class="thresholdBarSeg thresholdBarSigners" style="flex-grow:${signersPct};flex-basis:0;flex-shrink:0">
+          <span class="thresholdBarCount">${signers.length}</span>
+          <span class="thresholdBarCaption">Подтверждающие</span>
+        </div>
+      </div>
+    </div>`;
+};
+
 const renderCurrentMultisigInfo = (): void => {
   const {
     tonBalance,
-    threshold,
     signers,
     proposers,
     allowArbitraryOrderSeqno,
@@ -361,9 +390,7 @@ const renderCurrentMultisigInfo = (): void => {
 
   // Render Multisig Info
 
-  $("#multisig_tonBalance").innerText = fromNano(tonBalance) + " GRAM";
-
-  $("#multisig_threshold").innerText = threshold + "/" + signers.length;
+  renderThresholdChart();
 
   $("#multisig_orderId").innerText = allowArbitraryOrderSeqno
     ? "Произвольный"
@@ -507,6 +534,25 @@ const updateMultisig = async (
     if (currentMultisigAddress !== multisigAddress) return;
     currentMultisigInfo = multisigInfo;
 
+    const registryEntry = findMultisigRegistryEntry(multisigAddress);
+    renderMultisigCard(registryEntry);
+    renderMultisigCardBalances(fromNano(multisigInfo.tonBalance));
+
+    if (registryEntry?.jetton) {
+      const jettonBalance = await fetchJettonBalance(
+        registryEntry.jetton.address,
+        multisigAddress,
+        IS_TESTNET,
+      );
+      if (currentMultisigAddress !== multisigAddress) return;
+      if (jettonBalance !== "") {
+        renderMultisigCardBalances(
+          fromNano(multisigInfo.tonBalance),
+          jettonBalance,
+        );
+      }
+    }
+
     renderCurrentMultisigInfo();
     toggle($("#multisig_content"), true);
     toggle($("#multisig_error"), false);
@@ -533,6 +579,49 @@ const updateMultisig = async (
   }
 };
 
+// Карточка мультикошелька на странице мультикошелька: аватар, название,
+// адрес и балансы (GRAM и жетон сообщества) — в стиле карточек главной страницы.
+
+const findMultisigRegistryEntry = (
+  address: string,
+): RegistryEntry | undefined =>
+  getSnapshotEntries().find(
+    (e) =>
+      e.testnet === IS_TESTNET && rawOfRegistry(e.address) === rawOfRegistry(address),
+  );
+
+const renderMultisigCard = (entry: RegistryEntry | undefined): void => {
+  const avatarImg = $("#multisigCardAvatar");
+  if (avatarImg) avatarImg.setAttribute("src", entry?.jetton?.logo || GRAM_LOGO_URL);
+  const nameEl = $("#multisigCardName");
+  if (nameEl) nameEl.innerText = entry?.name || "Мультикошелек";
+};
+
+const renderMultisigCardBalances = (
+  gramBalance: string,
+  jettonBalance?: string,
+): void => {
+  const container = $("#multisigCardBalances");
+  if (!container) return;
+  const lines: string[] = [];
+  if (gramBalance !== "") {
+    lines.push(daoBalanceHTML(GRAM_LOGO_URL, gramBalance, "GRAM"));
+  }
+  if (jettonBalance !== undefined && jettonBalance !== "") {
+    const jetton = findMultisigRegistryEntry(currentMultisigAddress)?.jetton;
+    if (jetton) {
+      lines.push(
+        daoBalanceHTML(
+          jetton.logo || "",
+          formatJettonAmount(jettonBalance, jetton.decimals ?? 0),
+          jetton.name,
+        ),
+      );
+    }
+  }
+  container.innerHTML = lines.map((l) => `<div>${l}</div>`).join("");
+};
+
 const setMultisigAddress = async (
   newMultisigAddress: string,
   queuedOrderId?: bigint,
@@ -549,6 +638,9 @@ const setMultisigAddress = async (
   multisigAddress.isBounceable = true;
   multisigAddress.isTestOnly = IS_TESTNET;
   $("#mulisig_address").innerHTML = makeAddressLink(multisigAddress);
+
+  renderMultisigCard(findMultisigRegistryEntry(currentMultisigAddress));
+  renderMultisigCardBalances("");
 
   await updateMultisig(newMultisigAddress, true);
 };
@@ -590,7 +682,7 @@ const roleBadgeHTML = (role: Role): string =>
       : "";
 
 const GRAM_LOGO_URL =
-  "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/gram/Gram%20Diamond%20Mark.svg";
+  "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/gram/Gram%20Circular%20Badge.svg";
 
 const daoBalanceHTML = (
   logoUrl: string,
