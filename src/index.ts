@@ -342,7 +342,7 @@ let currentMultisigAddress: string | undefined = undefined;
 let currentMultisigInfo: MultisigInfo | undefined = undefined;
 let updateMultisigTimeoutId: any = -1;
 
-const ORDERS_PAGE_SIZE = 10;
+const ORDERS_PAGE_SIZE = 5;
 let lastOrdersOffset = 0;
 
 const clearMultisig = (): void => {
@@ -492,6 +492,10 @@ const renderCurrentMultisigInfo = (): void => {
   let wasPending = false;
   let wasExecuted = false;
 
+  if (lastOrdersOffset > 0 && lastOrdersOffset >= lastOrders.length) {
+    lastOrdersOffset = Math.max(0, lastOrders.length - ORDERS_PAGE_SIZE);
+  }
+
   const pageOrders = lastOrders.slice(
     lastOrdersOffset,
     lastOrdersOffset + ORDERS_PAGE_SIZE,
@@ -591,6 +595,8 @@ const updateMultisig = async (
       }
     }
 
+    toggle($("#multisigCardSkeleton"), false);
+    toggle($("#multisigCard"), true);
     renderCurrentMultisigInfo();
     toggle($("#multisig_content"), true);
     toggle($("#multisig_error"), false);
@@ -599,11 +605,17 @@ const updateMultisig = async (
 
     // Render error if still relevant
     if (currentMultisigAddress !== multisigAddress) return;
-    if (isFirst || !e?.message?.startsWith("Timeout")) {
+
+    if (isFirst) {
+      toggle($("#multisigCardSkeleton"), false);
+      toggle($("#multisigCard"), true);
       toggle($("#multisig_content"), false);
       toggle($("#multisig_error"), true);
       showErrorNotification($("#multisig_error"), e.message);
     }
+    // При последующих обновлениях временные ошибки (таймаут, HTTP 5xx,
+    // rate limit, «Invalid magic») не сбрасывают страницу — оставляем
+    // последние отображённые данные и продолжаем цикл обновления.
   }
 
   clearTimeout(updateMultisigTimeoutId);
@@ -611,10 +623,6 @@ const updateMultisig = async (
     () => updateMultisig(multisigAddress, false),
     5000,
   );
-
-  if (isFirst) {
-    showScreen("multisigScreen");
-  }
 };
 
 // Карточка мультикошелька на странице мультикошелька: аватар, название,
@@ -663,8 +671,11 @@ const renderMultisigCardBalances = (
 const setMultisigAddress = async (
   newMultisigAddress: string,
   queuedOrderId?: bigint,
+  showSkeleton = true,
 ): Promise<void> => {
-  showScreen("loadingScreen");
+  if (showSkeleton) {
+    showScreen("multisigScreen");
+  }
   clearMultisig();
 
   currentMultisigAddress = newMultisigAddress;
@@ -679,6 +690,17 @@ const setMultisigAddress = async (
 
   renderMultisigCard(findMultisigRegistryEntry(currentMultisigAddress));
   renderMultisigCardBalances("");
+
+  // Пока данные мультикошелька грузятся в фоне, показываем мигающий размытый
+  // скелетон вместо карточки адреса. Реальные данные появятся, только если
+  // полная загрузка прошла успешно. Скелетон показывается только на странице
+  // мультикошелька; при прямом открытии заявки (showSkeleton=false) его нет.
+  if (showSkeleton) {
+    toggle($("#multisigCardSkeleton"), true);
+    toggle($("#multisigCard"), false);
+    toggle($("#multisig_content"), false);
+    toggle($("#multisig_error"), false);
+  }
 
   await updateMultisig(newMultisigAddress, true);
 };
@@ -1159,6 +1181,9 @@ const setOrderId = async (
   if (!currentMultisigInfo) throw new Error("setOrderId: no multisig info");
 
   showScreen("loadingScreen");
+  // Скелетон карточки адреса показывается только на странице мультикошелька —
+  // на странице заявки его быть не должно.
+  toggle($("#multisigCardSkeleton"), false);
   clearOrder();
   currentOrderId = newOrderId;
   pushUrlState(currentMultisigAddress, newOrderId);
@@ -2762,12 +2787,22 @@ const processUrl = async () => {
       showScreen("startScreen");
     } else {
       const newMultisigAddress = formatContractAddress(multisigAddress.address);
-      await setMultisigAddress(newMultisigAddress, orderId);
-      if (
-        orderId !== undefined &&
-        currentMultisigAddress === newMultisigAddress
-      ) {
-        await setOrderId(orderId, undefined);
+      if (orderId !== undefined) {
+        // Прямая ссылка на заявку: мультикошелек грузим в фоне без показа
+        // скелетона карточки адреса (размытый элемент остаётся только на
+        // странице мультикошелька) и переходим к странице заявки.
+        showScreen("loadingScreen");
+        await setMultisigAddress(newMultisigAddress, orderId, false);
+        if (
+          currentMultisigAddress === newMultisigAddress &&
+          currentMultisigInfo !== undefined
+        ) {
+          await setOrderId(orderId, undefined);
+        } else {
+          showScreen("multisigScreen");
+        }
+      } else {
+        await setMultisigAddress(newMultisigAddress);
       }
     }
   } else {

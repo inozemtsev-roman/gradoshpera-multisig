@@ -7,7 +7,11 @@ import {
 } from "../utils/utils";
 import { Address, Cell, Dictionary } from "@ton/core";
 import { endParse, Multisig, parseMultisigData } from "./Multisig";
-import { MyNetworkProvider, sendToIndex } from "../utils/MyNetworkProvider";
+import {
+  MyNetworkProvider,
+  parseCellFromStateString,
+  sendToIndex,
+} from "../utils/MyNetworkProvider";
 import { Op } from "./Constants";
 import { Order } from "./Order";
 import { checkMultisigOrder, MultisigOrderInfo } from "./MultisigOrderChecker";
@@ -17,7 +21,7 @@ const TRACE_BATCH_SIZE = 50;
 // Сколько последних заявок обогащать деталями (get-методы, трассы выполнения).
 // Остальные заявки в списке показываются без деталей, чтобы не создавать лишние
 // запросы к API и не ловить rate limit.
-const MAX_ORDER_DETAILS = 10;
+const MAX_ORDER_DETAILS = 5;
 
 interface ToncenterMessage {
   decoded_opcode?: string | null;
@@ -156,36 +160,43 @@ const parseNewOrderOutMsg = (outMsg: any) => {
   const initState = Cell.fromBase64(outMsg.init_state.body);
   const parsed = parseNewOrderInitState(initState);
 
-  const body = Cell.fromBase64(outMsg.message_content.body).beginParse();
-  assert(body.loadUint(32) === Op.order.init, "invalid op");
-  const queryId = body.loadUint(64);
-  const threshold = body.loadUint(8);
-  const signers = body
-    .loadRef()
-    .beginParse()
-    .loadDictDirect(Dictionary.Keys.Uint(8), Dictionary.Values.Address());
-  const expiredAt = body.loadUint(48);
-  const order = body
-    .loadRef()
-    .beginParse()
-    .loadDictDirect(Dictionary.Keys.Uint(8), Dictionary.Values.Cell());
-  const isSigner = body.loadUint(1);
-  let signerIndex = undefined;
-  if (isSigner) {
-    signerIndex = body.loadUint(8);
+  try {
+    const body = Cell.fromBase64(outMsg.message_content.body).beginParse();
+    assert(body.loadUint(32) === Op.order.init, "invalid op");
+    const queryId = body.loadUint(64);
+    const threshold = body.loadUint(8);
+    const signers = body
+      .loadRef()
+      .beginParse()
+      .loadDictDirect(Dictionary.Keys.Uint(8), Dictionary.Values.Address());
+    const expiredAt = body.loadUint(48);
+    const order = body
+      .loadRef()
+      .beginParse()
+      .loadDictDirect(Dictionary.Keys.Uint(8), Dictionary.Values.Cell());
+    const isSigner = body.loadUint(1);
+    let signerIndex = undefined;
+    if (isSigner) {
+      signerIndex = body.loadUint(8);
+    }
+
+    console.log("OUT", {
+      queryId,
+      threshold,
+      signers,
+      expiredAt,
+      order,
+      isSigner,
+      signerIndex,
+    });
+
+    endParse(body);
+  } catch (e) {
+    // Тело сообщения в не-BOC формате (например, raw_body от tonapi) или
+    // не парсится — для списка заявок достаточно адреса заявки и её номера
+    // из init state, поэтому ошибка не фатальна.
+    console.warn("Failed to parse new order out message body:", e);
   }
-
-  console.log("OUT", {
-    queryId,
-    threshold,
-    signers,
-    expiredAt,
-    order,
-    isSigner,
-    signerIndex,
-  });
-
-  endParse(body);
 
   return {
     orderAddress,
@@ -241,13 +252,13 @@ export const checkMultisig = async (
   );
 
   assert(
-    Cell.fromBase64(result.code).equals(multisigCode),
+    parseCellFromStateString(result.code, "code").equals(multisigCode),
     "Код контракта НЕ совпадает с кодом мультикошелька из этого репозитория",
   );
 
   const tonBalance = result.balance;
 
-  const data = Cell.fromBase64(result.data);
+  const data = parseCellFromStateString(result.data, "data");
   const parsedData = parseMultisigData(data);
 
   if (parsedData.allowArbitraryOrderSeqno) {
