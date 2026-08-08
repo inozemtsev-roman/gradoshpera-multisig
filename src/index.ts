@@ -201,26 +201,13 @@ const showScreen = (name: ScreenType): void => {
 };
 
 const goHome = (): void => {
-  if (
-    currentScreen === "startScreen" ||
-    currentScreen === "loadingScreen" ||
-    currentScreen === "multisigScreen"
-  ) {
+  if (currentScreen === "startScreen") {
     return;
   }
-  if (
-    currentScreen === "importScreen" ||
-    (currentScreen === "newMultisigScreen" && !currentMultisigInfo)
-  ) {
-    newMultisigClear();
-    showScreen("startScreen");
-  } else {
-    clearOrder();
-    newOrderClear();
-    newMultisigClear();
-    pushUrlState(currentMultisigAddress);
-    showScreen("multisigScreen");
-  }
+  clearOrder();
+  newOrderClear();
+  newMultisigClear();
+  showScreen("startScreen");
 };
 
 $("#header_logo").addEventListener("click", () => goHome());
