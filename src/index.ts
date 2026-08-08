@@ -201,26 +201,13 @@ const showScreen = (name: ScreenType): void => {
 };
 
 const goHome = (): void => {
-  if (
-    currentScreen === "startScreen" ||
-    currentScreen === "loadingScreen" ||
-    currentScreen === "multisigScreen"
-  ) {
+  if (currentScreen === "startScreen") {
     return;
   }
-  if (
-    currentScreen === "importScreen" ||
-    (currentScreen === "newMultisigScreen" && !currentMultisigInfo)
-  ) {
-    newMultisigClear();
-    showScreen("startScreen");
-  } else {
-    clearOrder();
-    newOrderClear();
-    newMultisigClear();
-    pushUrlState(currentMultisigAddress);
-    showScreen("multisigScreen");
-  }
+  clearOrder();
+  newOrderClear();
+  newMultisigClear();
+  showScreen("startScreen");
 };
 
 $("#header_logo").addEventListener("click", () => goHome());
@@ -354,7 +341,7 @@ const clearMultisig = (): void => {
 
 // Линейная диаграмма порога: длинный прямоугольник со скруглёнными краями в стиле
 // карточки адреса мультикошелька; левая часть — порог (threshold), правая — число
-// подтверждающих (signers); ширина каждой части пропорциональна соответствующему
+// подписантов (signers); ширина каждой части пропорциональна соответствующему
 // числу; внутри каждой части крупным жирным шрифтом — количество из порога.
 
 const renderThresholdChart = (): void => {
@@ -369,14 +356,14 @@ const renderThresholdChart = (): void => {
 
   container.innerHTML = `
     <div class="thresholdBarWrap">
-      <div class="thresholdBar" role="img" aria-label="Порог и число подтверждающих">
+      <div class="thresholdBar" role="img" aria-label="Порог и число подписантов">
         <div class="thresholdBarSeg thresholdBarThreshold" style="flex-grow:${thresholdPct};flex-basis:0;flex-shrink:0">
           <span class="thresholdBarCount">${threshold}</span>
           <span class="thresholdBarCaption">Порог</span>
         </div>
         <div class="thresholdBarSeg thresholdBarSigners" style="flex-grow:${signersPct};flex-basis:0;flex-shrink:0">
           <span class="thresholdBarCount">${signers.length}</span>
-          <span class="thresholdBarCaption">Подтверждающие</span>
+          <span class="thresholdBarCaption">Подписанты</span>
         </div>
       </div>
     </div>`;
@@ -421,7 +408,7 @@ const renderCurrentMultisigInfo = (): void => {
     }
     $("#multisig_proposersList").innerHTML = proposersHTML;
   } else {
-    $("#multisig_proposersList").innerHTML = "Нет предлагающих";
+    $("#multisig_proposersList").innerHTML = "Нет инициаторов";
   }
 
   // Render Last Orders
@@ -736,9 +723,9 @@ const rawOfRegistry = (friendly: string): string => {
 
 const roleBadgeHTML = (role: Role): string =>
   role === "signer"
-    ? ' <span class="badge">Подписывающий</span>'
+    ? ' <span class="badge">Подписант</span>'
     : role === "proposer"
-      ? ' <span class="badge">Предлагающий</span>'
+      ? ' <span class="badge">Инициатор</span>'
       : "";
 
 const GRAM_LOGO_URL =
@@ -1089,7 +1076,7 @@ const renderCurrentOrderInfo = (): void => {
     ? "Порог мультикошелька не совпадает с порогом заявки"
     : "";
   $("#order_signersError").innerText = isMismatchSigners
-    ? "Подписывающие мультикошелька не совпадают с подписывающими заявку"
+    ? "Подписанты мультикошелька не совпадают с подписантами заявки"
     : "";
 
   let actionsHTML = "";
@@ -1234,7 +1221,7 @@ $("#order_approveButton").addEventListener("click", async () => {
   );
 
   if (mySignerIndex == -1) {
-    alert("Вы не подписывающий");
+    alert("Вы не подписант");
     return;
   }
 
@@ -2172,7 +2159,7 @@ $("#newOrder_createButton").addEventListener("click", async () => {
   );
 
   if (myProposerIndex === -1 && mySignerIndex === -1) {
-    alert("Ошибка: вы не предлагающий и не подписывающий");
+    alert("Ошибка: вы не инициатор и не подписант");
     setNewOrderMode("fill");
     return;
   }
@@ -2548,14 +2535,14 @@ $("#newMultisig_createButton").addEventListener("click", async () => {
   for (let i = 0; i < newMultisigInfo.signersCount; i++) {
     const input = $(`#newMultisig_signer${i}`) as HTMLInputElement;
     if (input.value === "") {
-      alert(`Подписывающий ${i}: пустое поле`);
+      alert(`Подписант ${i}: пустое поле`);
       return;
     }
 
     const addressString = input.value;
     const error = validateUserFriendlyAddress(addressString, IS_TESTNET);
     if (error) {
-      alert(`Подписывающий ${i}: ${error}`);
+      alert(`Подписант ${i}: ${error}`);
       return;
     }
     const address = Address.parseFriendly(addressString).address;
@@ -2571,14 +2558,14 @@ $("#newMultisig_createButton").addEventListener("click", async () => {
   for (let i = 0; i < newMultisigInfo.proposersCount; i++) {
     const input = $(`#newMultisig_proposer${i}`) as HTMLInputElement;
     if (input.value === "") {
-      alert(`Предлагающий ${i}: пустое поле`);
+      alert(`Инициатор ${i}: пустое поле`);
       return;
     }
 
     const addressString = input.value;
     const error = validateUserFriendlyAddress(addressString, IS_TESTNET);
     if (error) {
-      alert(`Предлагающий ${i}: ${error}`);
+      alert(`Инициатор ${i}: ${error}`);
       return;
     }
     const address = Address.parseFriendly(addressString).address;
@@ -2636,7 +2623,7 @@ $("#newMultisig_createButton").addEventListener("click", async () => {
     );
 
     if (myProposerIndex === -1 && mySignerIndex === -1) {
-      alert("Ошибка: вы не преедлагающий и не подписывающий");
+      alert("Ошибка: вы не инициатор и не подписант");
       return;
     }
 

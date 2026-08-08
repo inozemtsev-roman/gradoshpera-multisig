@@ -482,14 +482,14 @@ export const checkMultisigOrder = async (
       actionString += `<div>Обновить параметры мультикошелька</div>`;
       actionString += `<div>Новый порог: ${newThreshold.toString()}</div>`;
 
-      actionString += "<div>Новые подписывающие:</div>";
+      actionString += "<div>Новые подписанты:</div>";
       for (let i = 0; i < newSigners.length; i++) {
         const signer = newSigners[i];
         const addressString = await formatAddressAndUrl(signer, isTestnet);
         actionString += `<div>#${i + 1} - ${addressString}</div>`;
       }
 
-      actionString += "<div>Новые предлагающие:</div>";
+      actionString += "<div>Новые инициаторы:</div>";
       if (newProposers.length > 0) {
         for (let i = 0; i < newProposers.length; i++) {
           const proposer = newProposers[i];
@@ -497,7 +497,7 @@ export const checkMultisigOrder = async (
           actionString += `<div>#${i + 1} - ${addressString}</div>`;
         }
       } else {
-        actionString += "<div>Нет предлагающих</div>";
+        actionString += "<div>Нет инициаторов</div>";
       }
     } else {
       throw new Error("Неизвестное действие");
