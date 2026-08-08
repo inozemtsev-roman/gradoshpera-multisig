@@ -273,7 +273,7 @@ export const checkMultisig = async (
 
   assert(
     signers.length === parsedData.signersCount,
-    "Некорректное количество подписывающих",
+    "Некорректное количество подписантов",
   );
   assert(parsedData.threshold > 0, "Порог <= 0");
   assert(parsedData.threshold <= parsedData.signersCount, "Некорректный порог");
@@ -597,7 +597,7 @@ export const checkMultisig = async (
             ) {
               lastOrder.type = "executed";
               lastOrder.errorMessage =
-                "Подписывающие или порог мультикошелька не совпадают с заявкой";
+                "Подписанты или порог мультикошелька не совпадают с заявкой";
             }
           } catch (e) {
             lastOrder.type = "executed";
