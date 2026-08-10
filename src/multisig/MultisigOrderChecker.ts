@@ -1,5 +1,6 @@
 import {
   AddressInfo,
+  addressAvatarHTML,
   addressToString,
   assert,
   equalsAddressLists,
@@ -483,19 +484,21 @@ export const checkMultisigOrder = async (
       actionString += `<div>Новый порог: ${newThreshold.toString()}</div>`;
 
       actionString += "<div>Новые подписанты:</div>";
+      actionString += '<div class="daoAvatarGrid">';
       for (let i = 0; i < newSigners.length; i++) {
-        const signer = newSigners[i];
-        const addressString = await formatAddressAndUrl(signer, isTestnet);
-        actionString += `<div>#${i + 1} - ${addressString}</div>`;
+        const f = await getAddressFormat(newSigners[i], isTestnet);
+        actionString += addressAvatarHTML(f, false);
       }
+      actionString += "</div>";
 
       actionString += "<div>Новые инициаторы:</div>";
       if (newProposers.length > 0) {
+        actionString += '<div class="daoAvatarGrid">';
         for (let i = 0; i < newProposers.length; i++) {
-          const proposer = newProposers[i];
-          const addressString = await formatAddressAndUrl(proposer, isTestnet);
-          actionString += `<div>#${i + 1} - ${addressString}</div>`;
+          const f = await getAddressFormat(newProposers[i], isTestnet);
+          actionString += addressAvatarHTML(f, false);
         }
+        actionString += "</div>";
       } else {
         actionString += "<div>Нет инициаторов</div>";
       }
