@@ -86,6 +86,65 @@ export const assert = (condition: boolean, error: string) => {
     }
 }
 
+const ADDRESS_AVATAR_COLORS = [
+    "#e91e63",
+    "#9c27b0",
+    "#673ab7",
+    "#3f51b5",
+    "#2196f3",
+    "#00bcd4",
+    "#009688",
+    "#4caf50",
+    "#8bc34a",
+    "#ff9800",
+    "#f44336",
+    "#607d8b",
+];
+
+const hashString = (s: string): number => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+        h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return h;
+};
+
+const avatarColor = (addressString: string): string =>
+    ADDRESS_AVATAR_COLORS[hashString(addressString) % ADDRESS_AVATAR_COLORS.length];
+
+// Карточка-аватар адреса: квадрат со скруглёнными углами в цвете адреса,
+// внутри — круг того же цвета с акцентным текстом (первые 2 и последние 2
+// символа адреса); справа сверху круга — плашка статуса (✅/❌); ниже по
+// центру — сокращённый адрес (6 + … + 4 символа), справа от адреса — плашка
+// «Вы» для вашего кошелька.
+export const addressAvatarHTML = (
+    address: AddressInfo,
+    isMe: boolean,
+    statusBadge?: string,
+): string => {
+    const addressString = addressToString(address);
+    const color = avatarColor(addressString);
+    const circleText = addressString.slice(0, 2) + "…" + addressString.slice(-2);
+    const shortAddr =
+        addressString.length > 12
+            ? addressString.slice(0, 6) + "…" + addressString.slice(-4)
+            : addressString;
+    const url = explorerUrl(addressString, address.isTestOnly);
+    return `
+        <a class="daoAvatarCard" href="${url}" target="_blank" title="${addressString}">
+            <div class="daoAvatarTile" style="background:${color}2e">
+                <div class="daoAvatarCircleWrap">
+                    <div class="daoAvatarCircle" style="background:${color}">${circleText}</div>
+                    ${statusBadge ? `<div class="daoAvatarStatusBadge">${statusBadge}</div>` : ""}
+                </div>
+            </div>
+            <div class="daoAvatarMeta">
+                <span class="daoAvatarAddress">${shortAddr}</span>
+                ${isMe ? '<span class="daoAvatarMe">Вы</span>' : ""}
+            </div>
+        </a>`;
+};
+
 export const sanitizeHTML = (text: string): string => {
     const d = document.createElement('div');
     d.innerText = text;

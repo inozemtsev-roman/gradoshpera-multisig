@@ -10,6 +10,7 @@ import {
 import { THEME, TonConnectUI } from "@tonconnect/ui";
 import {
   AddressInfo,
+  addressAvatarHTML,
   addressToString,
   base64toHex,
   equalsAddressLists,
@@ -73,8 +74,6 @@ const $$ = (selector: string): NodeListOf<HTMLElement> =>
 const toggle = (element: HTMLElement, isVisible: boolean): void => {
   element.style.display = isVisible ? "flex" : "none";
 };
-
-const YOU_BADGE: string = ` <div class="badge">Это вы</div>`;
 
 // УВЕДОМЛЕНИЯ ОБ ОШИБКАХ
 
@@ -392,10 +391,11 @@ const renderCurrentMultisigInfo = (): void => {
   let signersHTML = "";
   for (let i = 0; i < signers.length; i++) {
     const signer = signers[i];
-    const addressString = makeAddressLink(signer);
-    signersHTML += `<div>#${i + 1} — ${addressString}${equalsMsgAddresses(signer.address, myAddress) ? YOU_BADGE : ""}</div>`;
+    const isMe = equalsMsgAddresses(signer.address, myAddress);
+    signersHTML += addressAvatarHTML(signer, isMe);
   }
   $("#multisig_signersList").innerHTML = signersHTML;
+  $("#multisig_signersList").classList.add("daoAvatarGrid");
 
   // Proposers
 
@@ -403,12 +403,14 @@ const renderCurrentMultisigInfo = (): void => {
     let proposersHTML = "";
     for (let i = 0; i < proposers.length; i++) {
       const proposer = proposers[i];
-      const addressString = makeAddressLink(proposer);
-      proposersHTML += `<div>#${i + 1} — ${addressString}${equalsMsgAddresses(proposer.address, myAddress) ? YOU_BADGE : ""}</div>`;
+      const isMe = equalsMsgAddresses(proposer.address, myAddress);
+      proposersHTML += addressAvatarHTML(proposer, isMe);
     }
     $("#multisig_proposersList").innerHTML = proposersHTML;
+    $("#multisig_proposersList").classList.add("daoAvatarGrid");
   } else {
     $("#multisig_proposersList").innerHTML = "Нет инициаторов";
+    $("#multisig_proposersList").classList.remove("daoAvatarGrid");
   }
 
   // Render Last Orders
@@ -504,14 +506,11 @@ const renderCurrentMultisigInfo = (): void => {
     lastOrdersHTML += formatOrder(lastOrder);
   }
 
-  if (lastOrdersOffset > 0) {
-    lastOrdersHTML +=
-      '<button class="lastOrdersPageButton" id="lastOrdersBackButton">Назад</button>';
-  }
-  if (lastOrdersOffset + ORDERS_PAGE_SIZE < lastOrders.length) {
-    lastOrdersHTML +=
-      '<button class="lastOrdersPageButton" id="lastOrdersMoreButton">Далее</button>';
-  }
+  lastOrdersHTML += `
+    <div class="lastOrdersPagination">
+      <button class="lastOrdersPageButton" id="lastOrdersBackButton" ${lastOrdersOffset > 0 ? "" : "disabled"}>Назад</button>
+      <button class="lastOrdersPageButton" id="lastOrdersMoreButton" ${lastOrdersOffset + ORDERS_PAGE_SIZE < lastOrders.length ? "" : "disabled"}>Далее</button>
+    </div>`;
 
   $("#mainScreen_ordersList").innerHTML = lastOrdersHTML;
 
@@ -1062,15 +1061,16 @@ const renderCurrentOrderInfo = (): void => {
   let signersHTML = "";
   for (let i = 0; i < signers.length; i++) {
     const signer = signers[i];
-    const addressString = makeAddressLink(signer);
     const mask = 1 << i;
     const isSigned = approvalsMask & mask;
     if (myAddress && isSigned && signer.address.equals(myAddress)) {
       isApprovedByMe = true;
     }
-    signersHTML += `<div>#${i + 1} — ${addressString} — ${isSigned ? "✅" : "❌"}${equalsMsgAddresses(signer.address, myAddress) ? YOU_BADGE : ""}</div>`;
+    const isMe = equalsMsgAddresses(signer.address, myAddress);
+    signersHTML += addressAvatarHTML(signer, isMe, isSigned ? "✅" : "❌");
   }
   $("#order_signersList").innerHTML = signersHTML;
+  $("#order_signersList").classList.add("daoAvatarGrid");
 
   $("#order_thresholdError").innerText = isMismatchThreshold
     ? "Порог мультикошелька не совпадает с порогом заявки"
