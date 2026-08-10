@@ -350,6 +350,13 @@ const callTonapiWithFetcher = async (
       );
       return { balance: entry ? String(entry.balance) : "0" };
     }
+    case "dnsName": {
+      // Обратная проверка TON DNS: accounts/{id} возвращает поле name,
+      // если у кошелька привязан .ton-домен.
+      const account = encodeURIComponent(String(params.account));
+      const json = await fetcher(rpc + "accounts/" + account);
+      return { name: typeof json.name === "string" ? json.name : null };
+    }
     default:
       throw new Error("Не поддерживаемый метод: " + method);
   }
@@ -386,6 +393,15 @@ const providersForMethod = (method: string): Provider[] => {
   const proxy = getProxyUrl();
   const list: Provider[] = [];
 
+  // dnsName есть только у tonapi — не ходим на toncenter.
+  if (method === "dnsName") {
+    if (proxy) {
+      list.push({ key: "proxy-tonapi", call: callTonapiViaProxy });
+    }
+    list.push({ key: "tonapi", call: callTonapiDirect });
+    return list;
+  }
+
   // Если прокси задан — сначала пробуем его (он разблокирует заблокированную сеть)
   if (proxy) {
     list.push({ key: "proxy-toncenter", call: callToncenterViaProxy });
@@ -404,6 +420,7 @@ const cacheableMethods = new Set([
   "addressBook",
   "jettonBalance",
   "traces",
+  "dnsName",
 ]);
 
 const responseCache: Map<string, { time: number; data: any }> = new Map();

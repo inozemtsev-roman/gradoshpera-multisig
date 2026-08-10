@@ -40,6 +40,7 @@ import { toUnits } from "./utils/units";
 import { checkJettonMinter } from "./jetton/JettonMinterChecker";
 import { storeStateInit } from "@ton/core/src/types/StateInit";
 import { MyNetworkProvider, sendToIndex } from "./utils/MyNetworkProvider";
+import { fetchDnsNames, getDnsName } from "./utils/Dns";
 import {
   addOpenedMultisig,
   fetchJettonBalance,
@@ -392,7 +393,12 @@ const renderCurrentMultisigInfo = (): void => {
   for (let i = 0; i < signers.length; i++) {
     const signer = signers[i];
     const isMe = equalsMsgAddresses(signer.address, myAddress);
-    signersHTML += addressAvatarHTML(signer, isMe);
+    signersHTML += addressAvatarHTML(
+      signer,
+      isMe,
+      undefined,
+      getDnsName(signer.address),
+    );
   }
   $("#multisig_signersList").innerHTML = signersHTML;
   $("#multisig_signersList").classList.add("daoAvatarGrid");
@@ -404,7 +410,12 @@ const renderCurrentMultisigInfo = (): void => {
     for (let i = 0; i < proposers.length; i++) {
       const proposer = proposers[i];
       const isMe = equalsMsgAddresses(proposer.address, myAddress);
-      proposersHTML += addressAvatarHTML(proposer, isMe);
+      proposersHTML += addressAvatarHTML(
+        proposer,
+        isMe,
+        undefined,
+        getDnsName(proposer.address),
+      );
     }
     $("#multisig_proposersList").innerHTML = proposersHTML;
     $("#multisig_proposersList").classList.add("daoAvatarGrid");
@@ -583,6 +594,13 @@ const updateMultisig = async (
 
     toggle($("#multisigCardSkeleton"), false);
     toggle($("#multisigCard"), true);
+    await fetchDnsNames(
+      [...multisigInfo.signers, ...multisigInfo.proposers].map(
+        (address) => address.address,
+      ),
+      IS_TESTNET,
+    );
+    if (currentMultisigAddress !== multisigAddress) return;
     renderCurrentMultisigInfo();
     toggle($("#multisig_content"), true);
     toggle($("#multisig_error"), false);
@@ -1067,7 +1085,12 @@ const renderCurrentOrderInfo = (): void => {
       isApprovedByMe = true;
     }
     const isMe = equalsMsgAddresses(signer.address, myAddress);
-    signersHTML += addressAvatarHTML(signer, isMe, isSigned ? "✅" : "❌");
+    signersHTML += addressAvatarHTML(
+      signer,
+      isMe,
+      isSigned ? "✅" : "❌",
+      getDnsName(signer.address),
+    );
   }
   $("#order_signersList").innerHTML = signersHTML;
   $("#order_signersList").classList.add("daoAvatarGrid");
@@ -1135,6 +1158,11 @@ const updateOrder = async (
     if (currentOrderId !== orderId) return;
     currentOrderInfo = orderInfo;
 
+    await fetchDnsNames(
+      orderInfo.signers.map((address) => address.address),
+      IS_TESTNET,
+    );
+    if (currentOrderId !== orderId) return;
     renderCurrentOrderInfo();
     toggle($("#order_content"), true);
     toggle($("#order_error"), false);

@@ -56,7 +56,7 @@ const SNAPSHOT: RegistryFile = {
         name: "Благо",
         address: "EQBlaryI1HCY6hIlW9giBoqKGtuMHfxlULZOhD6UyzpqLcll",
         decimals: 0,
-        logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/main/logo.png",
+        logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/logo.svg",
       },
     },
   ],
@@ -148,7 +148,9 @@ export const getSnapshotEntries = (): RegistryEntry[] =>
   finalizeEntries(SNAPSHOT);
 
 // Реестр мультикошельков ДАО: прямой raw.githubusercontent.com -> прокси -> снапшот.
-export const fetchRegistry = async (force = false): Promise<RegistryEntry[]> => {
+export const fetchRegistry = async (
+  force = false,
+): Promise<RegistryEntry[]> => {
   if (!force) {
     const cached = loadRegistryCache();
     if (cached) return finalizeEntries(cached);
@@ -256,7 +258,8 @@ export const fetchJettonBalance = async (
   isTestnet: boolean,
 ): Promise<string> => {
   try {
-    const jettonRaw = Address.parseFriendly(jettonAddress).address.toRawString();
+    const jettonRaw =
+      Address.parseFriendly(jettonAddress).address.toRawString();
     const ownerRaw = Address.parseFriendly(ownerAddress).address.toRawString();
     const data = await sendToIndex(
       "jettonBalance",
