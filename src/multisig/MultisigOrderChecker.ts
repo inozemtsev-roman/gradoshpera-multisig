@@ -24,6 +24,7 @@ import {
   parseCellFromStateString,
   sendToIndex,
 } from "../utils/MyNetworkProvider";
+import { fetchDnsNames, getDnsName } from "../utils/Dns";
 import {
   intToLockType,
   JettonMinter,
@@ -485,18 +486,30 @@ export const checkMultisigOrder = async (
 
       actionString += "<div>Новые подписанты:</div>";
       actionString += '<div class="daoAvatarGrid">';
+      await fetchDnsNames(newSigners, isTestnet);
       for (let i = 0; i < newSigners.length; i++) {
         const f = await getAddressFormat(newSigners[i], isTestnet);
-        actionString += addressAvatarHTML(f, false);
+        actionString += addressAvatarHTML(
+          f,
+          false,
+          undefined,
+          getDnsName(newSigners[i]),
+        );
       }
       actionString += "</div>";
 
       actionString += "<div>Новые инициаторы:</div>";
       if (newProposers.length > 0) {
         actionString += '<div class="daoAvatarGrid">';
+        await fetchDnsNames(newProposers, isTestnet);
         for (let i = 0; i < newProposers.length; i++) {
           const f = await getAddressFormat(newProposers[i], isTestnet);
-          actionString += addressAvatarHTML(f, false);
+          actionString += addressAvatarHTML(
+            f,
+            false,
+            undefined,
+            getDnsName(newProposers[i]),
+          );
         }
         actionString += "</div>";
       } else {
