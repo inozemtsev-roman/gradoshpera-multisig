@@ -7,7 +7,12 @@ import {
   storeMessageRelaxed,
   toNano,
 } from "@ton/core";
-import { THEME, TonConnectUI } from "@tonconnect/ui";
+import {
+  THEME,
+  TonConnectUI,
+  isWalletInfoRemote,
+  WalletInfo,
+} from "@tonconnect/ui";
 import {
   AddressInfo,
   addressAvatarHTML,
@@ -249,6 +254,97 @@ tonConnectUI.uiOptions = {
 // в наших обработчиках перед sendTransaction нет асинхронных вызовов).
 const SEND_TRANSACTION_TIMEOUT_MS = 90000;
 
+// Оригинальный getWallets (неотфильтрованный список) — используется для
+// поиска bridge подключённого кошелька, даже если этот кошелёк скрыт из
+// модалки из-за недостижимого bridge.
+const originalGetWallets = tonConnectUI.getWallets.bind(tonConnectUI);
+
+// Если кошелёк подключён по HTTP, он отвечает через свой bridge-сервер
+// (например, bridge.tonkeeper.com). Когда этот домен не резолвится или не
+// доступен (ERR_NAME_NOT_RESOLVED / ERR_TIMED_OUT), sendTransaction молча
+// «зависает» до таймаута, хотя дело не в ожидании подтверждения в кошельке.
+// Поэтому до отправки проверяем, достижим ли bridge подключённого кошелька, и
+// при недоступности сразу показываем понятное сообщение.
+const BRIDGE_CHECK_TIMEOUT_MS = 8000;
+
+const getConnectedBridgeUrl = async (): Promise<string | null> => {
+  const wallet = tonConnectUI.wallet;
+  if (!wallet || wallet.provider !== "http") {
+    return null;
+  }
+  try {
+    const wallets: WalletInfo[] = await originalGetWallets();
+    const info = wallets.find((w) => w.appName === wallet.device.appName);
+    if (info && isWalletInfoRemote(info)) {
+      return info.bridgeUrl;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return null;
+};
+
+// Проверка достижимости bridge: достаточно, чтобы браузер смог установить
+// соединение с хостом. Режим no-cors не даёт прочитать ответ, но отклоняет
+// запрос при сетевой ошибке (нерезолвится DNS, нет соединения) — это нам и
+// нужно. Статусы HTTP не важны.
+const checkBridgeReachable = async (bridgeUrl: string): Promise<boolean> => {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    BRIDGE_CHECK_TIMEOUT_MS,
+  );
+  try {
+    let origin = bridgeUrl;
+    try {
+      origin = new URL(bridgeUrl).origin + "/";
+    } catch (e) {}
+    await fetch(origin, {
+      method: "GET",
+      mode: "no-cors",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return true;
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+// Недавно недоступные bridge кэшируем на короткое время, чтобы повторная
+// попытка отправить транзакцию не ждала проверку заново.
+const unreachableBridgesCache = new Map<string, number>();
+const UNREACHABLE_BRIDGE_CACHE_MS = 30000;
+
+const bridgeUnreachableMessage = (bridgeUrl: string): string => {
+  let host = bridgeUrl;
+  try {
+    host = new URL(bridgeUrl).host;
+  } catch (e) {}
+  return (
+    "Не удалось связаться с bridge-сервером кошелька (" +
+    host +
+    "). Проверьте интернет-соединение или подключите другой кошелёк."
+  );
+};
+
+const isBridgeUnreachableError = (error: any): boolean => {
+  if (!error) return false;
+  const message = error.message || error.toString?.() || "";
+  return (
+    message.indexOf("Failed to fetch") > -1 ||
+    message.indexOf("NetworkError") > -1 ||
+    message.indexOf("Load failed") > -1 ||
+    message.indexOf("ERR_NAME_NOT_RESOLVED") > -1 ||
+    message.indexOf("ERR_CONNECTION") > -1 ||
+    message.indexOf("ERR_INTERNET_DISCONNECTED") > -1 ||
+    message.indexOf("ERR_TIMED_OUT") > -1 ||
+    message.indexOf("Network request failed") > -1
+  );
+};
+
 type TonConnectTransaction = Parameters<
   typeof tonConnectUI.sendTransaction
 >[0];
@@ -256,6 +352,23 @@ type TonConnectTransaction = Parameters<
 const sendTransactionWithTimeout = async (
   transaction: TonConnectTransaction,
 ): Promise<void> => {
+  const bridgeUrl = await getConnectedBridgeUrl();
+
+  if (bridgeUrl) {
+    const cachedFailAt = unreachableBridgesCache.get(bridgeUrl);
+    const cachedFresh =
+      cachedFailAt !== undefined &&
+      Date.now() - cachedFailAt < UNREACHABLE_BRIDGE_CACHE_MS;
+    const reachable = cachedFresh
+      ? false
+      : await checkBridgeReachable(bridgeUrl);
+    if (!reachable) {
+      unreachableBridgesCache.set(bridgeUrl, Date.now());
+      throw new Error(bridgeUnreachableMessage(bridgeUrl));
+    }
+    unreachableBridgesCache.delete(bridgeUrl);
+  }
+
   let settled = false;
   let timer: any;
   await new Promise<void>((resolve, reject) => {
@@ -283,12 +396,76 @@ const sendTransactionWithTimeout = async (
           if (!settled) {
             settled = true;
             clearTimeout(timer);
-            reject(error);
+            // Bridge мог стать недоступен уже после проверки — мапим сетевую
+            // ошибку в понятное сообщение.
+            if (bridgeUrl && isBridgeUnreachableError(error)) {
+              reject(new Error(bridgeUnreachableMessage(bridgeUrl)));
+            } else {
+              reject(error);
+            }
           }
         },
       );
   });
 };
+
+// Модалка TonConnect при открытии подключается к bridge-серверам ВСЕХ
+// кошельков из списка (см. BridgeProvider.openGateways в @tonconnect/sdk),
+// чтобы любой выбранный кошелёк сразу отвечал. Если у кошелька мёртвый или
+// недостижимый bridge, SDK уходит в ретраи каждые 2 секунды: сыплются лишние
+// запросы /bridge/events и ошибки ERR_NAME_NOT_RESOLVED. Чтобы этого избежать,
+// проверяем достижимость bridge при загрузке списка и отдаём модалке только
+// рабочие кошельки (injected/JS-кошельки не трогаем — у них нет bridge).
+
+const bridgeReachableCache = new Map<string, { reachable: boolean; at: number }>();
+const bridgeReachabilityInflight = new Map<string, Promise<boolean>>();
+const BRIDGE_REACHABILITY_CACHE_MS = 5 * 60 * 1000;
+
+const probeBridgeReachability = async (bridgeUrl: string): Promise<boolean> => {
+  const cached = bridgeReachableCache.get(bridgeUrl);
+  if (cached && Date.now() - cached.at < BRIDGE_REACHABILITY_CACHE_MS) {
+    return cached.reachable;
+  }
+  const inflight = bridgeReachabilityInflight.get(bridgeUrl);
+  if (inflight) {
+    return inflight;
+  }
+  const promise = checkBridgeReachable(bridgeUrl).then((reachable) => {
+    bridgeReachableCache.set(bridgeUrl, { reachable, at: Date.now() });
+    bridgeReachabilityInflight.delete(bridgeUrl);
+    return reachable;
+  });
+  bridgeReachabilityInflight.set(bridgeUrl, promise);
+  return promise;
+};
+
+const filterReachableWallets = async (
+  wallets: WalletInfo[],
+): Promise<WalletInfo[]> => {
+  const uniqueBridges = Array.from(
+    new Set(wallets.filter(isWalletInfoRemote).map((w) => w.bridgeUrl)),
+  );
+  await Promise.all(uniqueBridges.map((url) => probeBridgeReachability(url)));
+  return wallets.filter((w) => {
+    if (!isWalletInfoRemote(w)) {
+      return true;
+    }
+    const cached = bridgeReachableCache.get(w.bridgeUrl);
+    return !cached || cached.reachable;
+  });
+};
+
+// Перехватываем getWallets, чтобы список для модалки и — главное — список
+// bridge для предварительных подключений содержал только рабочие кошельки.
+tonConnectUI.getWallets = (async () => {
+  const wallets = await originalGetWallets();
+  try {
+    return await filterReachableWallets(wallets);
+  } catch (e) {
+    console.error(e);
+    return wallets;
+  }
+}) as typeof tonConnectUI.getWallets;
 
 // Кнопка TON Connect: стандартный текст «Подключить кошелёк» не помещается на
 // экране мобильного — сокращаем его до «Кошелек». Состояние «подключено»
@@ -810,7 +987,6 @@ const setMultisigAddress = async (
   clearMultisig();
 
   currentMultisigAddress = newMultisigAddress;
-  localStorage.setItem("multisigAddress", newMultisigAddress);
   addOpenedMultisig(newMultisigAddress);
   pushUrlState(newMultisigAddress, queuedOrderId);
 
@@ -837,7 +1013,6 @@ const setMultisigAddress = async (
 };
 
 $("#multisig_logoutButton").addEventListener("click", () => {
-  localStorage.removeItem("multisigAddress");
   clearMultisig();
   showScreen("startScreen");
 });
@@ -867,9 +1042,9 @@ const rawOfRegistry = (friendly: string): string => {
 
 const roleBadgeHTML = (role: Role): string =>
   role === "signer"
-    ? ' <span class="badge">Подписант</span>'
+    ? '<span class="badge badgeSigner">Подписант</span>'
     : role === "proposer"
-      ? ' <span class="badge">Инициатор</span>'
+      ? '<span class="badge badgeProposer">Инициатор</span>'
       : "";
 
 const GRAM_LOGO_URL =
@@ -887,6 +1062,7 @@ const daoMultisigItemHTML = (
   address: string,
   status: MultisigStatus,
   jettonInfo?: { name: string; amount: string; logo?: string },
+  logo?: string,
   mine = false,
   pending = false,
 ): string => {
@@ -922,16 +1098,17 @@ const daoMultisigItemHTML = (
     lines = [sanitizeHTML(status.error || "Ошибка проверки")];
   }
 
-  const avatar = jettonInfo?.logo || GRAM_LOGO_URL;
+  const avatar = logo || jettonInfo?.logo || GRAM_LOGO_URL;
   const balances = lines.map((l) => `<div>${l}</div>`).join("");
 
-  return `<div class="daoMultisigItem${mine ? " daoMultisigMine" : ""}" data-address="${address}"><div class="daoMultisigAvatar"><img src="${avatar}" alt=""></div><div class="daoMultisigName">${sanitizeHTML(name) || "Мультикошелек"}${roleBadgeHTML(status.role)}</div><div class="daoMultisigAddress">${makeAddressLink(info)}</div><div class="daoMultisigBalances">${balances}</div></div>`;
+  return `<div class="daoMultisigItem${mine ? " daoMultisigMine" : ""}" data-address="${address}"><div class="daoMultisigAvatarWrap"><div class="daoMultisigAvatar"><img src="${avatar}" alt=""></div>${roleBadgeHTML(status.role)}</div><div class="daoMultisigName">${sanitizeHTML(name) || "Мультикошелек"}</div><div class="daoMultisigAddress">${makeAddressLink(info)}</div><div class="daoMultisigBalances">${balances}</div></div>`;
 };
 
 interface DaoListItem {
   name: string;
   address: string;
   mine: boolean;
+  logo?: string;
   jetton?: RegistryJetton;
 }
 
@@ -960,6 +1137,23 @@ const buildDaoListItems = (entries: RegistryEntry[]): DaoListItem[] => {
       name: entry.name,
       address: entry.address,
       mine: false,
+      logo: entry.logo,
+      jetton: entry.jetton,
+    });
+  }
+
+  // Снапшотные записи реестра показываем всегда, даже если удалённый реестр
+  // их ещё не содержит — карточка не должна исчезать после загрузки реестра.
+  for (const entry of getSnapshotEntries()) {
+    if (entry.testnet !== IS_TESTNET) continue;
+    const raw = rawOfRegistry(entry.address);
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    items.push({
+      name: entry.name,
+      address: entry.address,
+      mine: false,
+      logo: entry.logo,
       jetton: entry.jetton,
     });
   }
@@ -999,6 +1193,7 @@ const daoMultisigsListHTML = (
         item.jetton
           ? { name: item.jetton.name, amount: "", logo: item.jetton.logo }
           : undefined,
+        item.logo,
         item.mine,
         true,
       );
@@ -1021,6 +1216,7 @@ const daoMultisigsListHTML = (
       item.address,
       result.status,
       jettonInfo,
+      item.logo,
       item.mine,
     );
   }
@@ -2840,14 +3036,11 @@ $("#newMultisig_createButton").addEventListener("click", async () => {
 
 // START
 
-const tryLoadMultisigFromLocalStorage = () => {
-  const multisigAddress: string = localStorage.getItem("multisigAddress");
-
-  if (!multisigAddress) {
-    showScreen("startScreen");
-  } else {
-    setMultisigAddress(multisigAddress);
-  }
+const showStartScreen = (): void => {
+  // Не открываем автоматически последний использованный мультикошелек —
+  // всегда показываем главную страницу. Прямые ссылки на мультикошелек
+  // (в адресе страницы) обрабатываются в processUrl.
+  showScreen("startScreen");
 };
 
 const parseAddressFromUrl = (url: string): undefined | AddressInfo => {
@@ -2936,7 +3129,7 @@ const processUrl = async () => {
       }
     }
   } else {
-    tryLoadMultisigFromLocalStorage();
+    showStartScreen();
   }
 };
 

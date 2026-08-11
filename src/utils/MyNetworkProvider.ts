@@ -395,8 +395,8 @@ const providersForMethod = (method: string): Provider[] => {
   const proxy = getProxyUrl();
   const list: Provider[] = [];
 
-  // dnsName есть только у tonapi — не ходим на toncenter.
-  if (method === "dnsName") {
+  // dnsName и jettonBalance есть только у tonapi — не ходим на toncenter.
+  if (method === "dnsName" || method === "jettonBalance") {
     if (proxy) {
       list.push({ key: "proxy-tonapi", call: callTonapiViaProxy });
     }
