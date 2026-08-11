@@ -745,7 +745,7 @@ button:disabled,
   font-weight: 700;
   height: auto;
   line-height: 1;
-  transform: translate(50%, 100%);
+  transform: translate(50%, 50%);
   border: 2px solid var(--bg-secondary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   white-space: nowrap;

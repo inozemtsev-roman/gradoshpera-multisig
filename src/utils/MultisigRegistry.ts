@@ -63,7 +63,7 @@ const SNAPSHOT: RegistryFile = {
     {
       name: "Чистая Лига",
       address: "UQACfRYh7GcZJwtB6zI5bn1DO58MXj1GIyY1u94Eg4TJFp8v",
-      logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/logo.svg",
+      logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/cleanliga/logo.svg",
       jetton: {
         name: "Благо",
         address: "EQBlaryI1HCY6hIlW9giBoqKGtuMHfxlULZOhD6UyzpqLcll",
@@ -140,16 +140,26 @@ const normalizeEntries = (file: RegistryFile): RegistryEntry[] =>
     jetton: e.jetton,
   }));
 
-// Если в удалённом реестре нет данных о жетоне, подтягиваем из снапшота.
+// Если в удалённом реестре нет данных о жетоне/логотипе, подтягиваем из
+// снапшота. Логотип из снапшота всегда в приоритете — карточки ДАО должны
+// показывать заданный в приложении логотип, а не устаревший из реестра.
 const enrichJettons = (entries: RegistryEntry[]): RegistryEntry[] => {
   const snapshotJettons = new Map<string, RegistryJetton>();
+  const snapshotLogos = new Map<string, string>();
   for (const e of SNAPSHOT.multisigs) {
     if (e.jetton) snapshotJettons.set(rawOf(e.address), e.jetton);
+    if (e.logo) snapshotLogos.set(rawOf(e.address), e.logo);
   }
   return entries.map((e) => {
-    if (e.jetton) return e;
-    const jetton = snapshotJettons.get(rawOf(e.address));
-    return jetton ? { ...e, jetton } : e;
+    const raw = rawOf(e.address);
+    const jetton = snapshotJettons.get(raw);
+    const logo = snapshotLogos.get(raw);
+    if (!jetton && !logo) return e;
+    return {
+      ...e,
+      jetton: jetton || e.jetton,
+      logo: logo || e.logo,
+    };
   });
 };
 

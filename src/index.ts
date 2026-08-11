@@ -946,7 +946,11 @@ const findMultisigRegistryEntry = (
 
 const renderMultisigCard = (entry: RegistryEntry | undefined): void => {
   const avatarImg = $("#multisigCardAvatar");
-  if (avatarImg) avatarImg.setAttribute("src", entry?.jetton?.logo || GRAM_LOGO_URL);
+  if (avatarImg)
+    avatarImg.setAttribute(
+      "src",
+      entry?.logo || entry?.jetton?.logo || GRAM_LOGO_URL,
+    );
   const nameEl = $("#multisigCardName");
   if (nameEl) nameEl.innerText = entry?.name || "Мультикошелек";
 };
