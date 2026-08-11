@@ -221,6 +221,10 @@ let myAddress: Address | null;
 const tonConnectUI = new TonConnectUI({
   manifestUrl: "https://multisig.gradosphera.org/tonconnect-manifest.json",
   buttonRootId: "tonConnectButton",
+  // Телеметрия TonConnect SDK шумит в консоли ошибками вида
+  // «Failed to send analytics events … Failed to fetch», когда запрос к
+  // analytics API недоступен. Сами события для приложения не нужны — off.
+  analytics: { mode: "off" },
 });
 
 tonConnectUI.uiOptions = {
@@ -237,6 +241,12 @@ tonConnectUI.uiOptions = {
 // не отвечает на запрос: окно «Подтвердите действие» остаётся висеть, а кнопка
 // блокируется. Дожидаемся ответа с таймаутом и всегда прокидываем ошибку, чтобы
 // интерфейс не блокировался навсегда.
+//
+// skipRedirectToWallet: "never" — решение из документации TonConnect (README
+// @tonconnect/ui 3.0.2, раздел «Universal links redirecting issues (IOS)»):
+// по умолчанию на iOS после sendTransaction переход к кошельку пропускается, и
+// кошелёк не показывает действие. «never» включает редирект (допустимо, т.к.
+// в наших обработчиках перед sendTransaction нет асинхронных вызовов).
 const SEND_TRANSACTION_TIMEOUT_MS = 90000;
 
 type TonConnectTransaction = Parameters<
@@ -259,22 +269,24 @@ const sendTransactionWithTimeout = async (
         );
       }
     }, SEND_TRANSACTION_TIMEOUT_MS);
-    tonConnectUI.sendTransaction(transaction).then(
-      () => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          resolve();
-        }
-      },
-      (error) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          reject(error);
-        }
-      },
-    );
+    tonConnectUI
+      .sendTransaction(transaction, { skipRedirectToWallet: "never" })
+      .then(
+        () => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          }
+        },
+        (error) => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            reject(error);
+          }
+        },
+      );
   });
 };
 
@@ -1378,7 +1390,7 @@ $("#order_approveButton").addEventListener("click", async () => {
     .toString("base64");
 
   const transaction = {
-    validUntil: Math.floor(Date.now() / 1000) + 60, // 1 minute
+    validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
     messages: [
       {
         address: orderAddressString,
@@ -2228,7 +2240,7 @@ $("#newOrder_createButton").addEventListener("click", async () => {
 
     try {
       await sendTransactionWithTimeout({
-        validUntil: Math.floor(Date.now() / 1000) + 60, // 1 minute
+        validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
         messages: [transactionToSent.message],
       });
       if (
@@ -2614,7 +2626,7 @@ $("#newMultisig_createButton").addEventListener("click", async () => {
       const multisigAddress = newMultisigTransactionToSend.multisigAddress;
 
       await sendTransactionWithTimeout({
-        validUntil: Math.floor(Date.now() / 1000) + 60, // 1 minute
+        validUntil: Math.floor(Date.now() / 1000) + 300, // 5 minutes
         messages: [newMultisigTransactionToSend.message],
       });
 

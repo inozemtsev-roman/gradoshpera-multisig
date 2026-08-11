@@ -210,7 +210,10 @@ export const checkMultisigOrder = async (
 
   const parseActionBody = async (
     cell: Cell,
-  ): Promise<{ text: string; jetton?: { amount: string; kind: "mint" | "transfer" } }> => {
+  ): Promise<{
+    text: string;
+    jetton?: { amount: string; kind: "mint" | "transfer" };
+  }> => {
     try {
       const slice = cell.beginParse();
       if (slice.remainingBits === 0 && slice.remainingRefs == 0) {
@@ -378,7 +381,7 @@ export const checkMultisigOrder = async (
         const queryId = slice.loadUint(64);
         const coins = slice.loadCoins();
         return {
-          text: `Вывод ${fromNano(coins)} TON из пула единого номинатора.`,
+          text: `Вывод ${fromNano(coins)} GRAM из пула единого номинатора.`,
         };
       }
     } catch (e) {}
@@ -453,9 +456,8 @@ export const checkMultisigOrder = async (
 
   let parsedActions: string[] = [];
   let summaryGram = "";
-  let summaryJetton:
-    | { amount: string; kind: "mint" | "transfer" }
-    | undefined = undefined;
+  let summaryJetton: { amount: string; kind: "mint" | "transfer" } | undefined =
+    undefined;
 
   const actionsKeys = actions.keys();
   for (let key of actionsKeys) {
@@ -507,7 +509,9 @@ export const checkMultisigOrder = async (
       }
 
       const destAddress = await formatAddressAndUrl(info.dest, isTestnet);
-      const gramAmount = allBalance ? "ВЕСЬ БАЛАНС" : fromNano(info.value.coins);
+      const gramAmount = allBalance
+        ? "ВЕСЬ БАЛАНС"
+        : fromNano(info.value.coins);
       actionString += `<div>Отправить ${gramAmount} GRAM на ${destAddress}</div>`;
       const parsedBody = await parseActionBody(messageRelaxed.body);
       actionString += `<div>${parsedBody.text}</div>`;
