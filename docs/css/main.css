@@ -366,8 +366,65 @@ button:disabled,
   border-bottom: 1px solid var(--border-color);
 }
 
+.orderListItem_status {
+  flex-shrink: 0;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .orderListItem_title {
   color: var(--link-color);
+  font-size: 16px;
+}
+
+.orderListItem_state {
+  font-weight: 600;
+}
+
+.orderListItem_approvals {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.orderListItem_stats {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 90px;
+}
+
+.orderListItem_gramCol {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 90px;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.orderListItem_jetton {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.orderListItem_link {
+  font-size: 13px;
+}
+
+.orderStatusIcon {
+  display: block;
+  flex-shrink: 0;
 }
 
 #multisig_error {
@@ -456,7 +513,26 @@ button:disabled,
 }
 
 .multisig_lastOrder {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   cursor: pointer;
+}
+
+.orderListItem_info {
+  flex: 1;
+  min-width: 0;
+}
+
+#mainScreen_ordersList .orderListItem_status,
+#mainScreen_ordersList .orderListItem_info,
+#mainScreen_ordersList .orderListItem_stats,
+#mainScreen_ordersList .orderListItem_gramCol,
+#mainScreen_ordersList .orderListItem_title,
+#mainScreen_ordersList .orderListItem_approvals {
+  padding: 0;
+  border-bottom: none;
 }
 
 #mainScreen_ordersList .lastOrdersPagination {
@@ -826,6 +902,20 @@ button:disabled,
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 0 0 2px var(--bg-color);
+}
+
+.daoAvatarMeBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
   box-shadow: 0 0 0 2px var(--bg-color);
 }
 

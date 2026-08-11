@@ -5,7 +5,7 @@ import {
   equalsAddressLists,
   getAddressFormat,
 } from "../utils/utils";
-import { Address, Cell, Dictionary } from "@ton/core";
+import { Address, Cell, Dictionary, fromNano } from "@ton/core";
 import { endParse, Multisig, parseMultisigData } from "./Multisig";
 import {
   MyNetworkProvider,
@@ -180,16 +180,6 @@ const parseNewOrderOutMsg = (outMsg: any) => {
       signerIndex = body.loadUint(8);
     }
 
-    console.log("OUT", {
-      queryId,
-      threshold,
-      signers,
-      expiredAt,
-      order,
-      isSigner,
-      signerIndex,
-    });
-
     endParse(body);
   } catch (e) {
     // Тело сообщения в не-BOC формате (например, raw_body от tonapi) или
@@ -215,7 +205,59 @@ export interface LastOrder {
     id: bigint;
   };
   orderInfo?: MultisigOrderInfo;
+  expiredAt?: number;
+  summary?: MultisigOrderInfo["summary"];
+  isParamsUpdate?: boolean;
 }
+
+// Сумма отправки GRAM для исполненной заявки берётся из исходящих сообщений
+// транзакции исполнения: мультикошелек при исполнении отправляет переводы
+// из действий заявки, и value первого исходящего сообщения — это сумма GRAM.
+const parseExecuteOutSummary = (
+  outMsgs: any[],
+): MultisigOrderInfo["summary"] | undefined => {
+  if (!Array.isArray(outMsgs)) return undefined;
+  let gram = "";
+  for (const msg of outMsgs) {
+    if (gram) break;
+    const value = msg?.value;
+    if (value == null) continue;
+    try {
+      const nano = BigInt(String(value));
+      if (nano <= 0n) continue;
+      gram = `${fromNano(nano)} GRAM`;
+    } catch {
+      continue;
+    }
+  }
+  return gram ? { gram } : undefined;
+};
+
+// Заявка «обновление параметров мультикошелька» не отправляет GRAM: для неё
+// в столбце с суммой вместо значения из исходящих сообщений транзакции
+// исполнения показывается подпись «Обновление». Тип определяем по набору
+// действий из тела сообщения new_order.
+const hasParamsUpdateAction = (actions: Dictionary<number, Cell>): boolean => {
+  for (const actionCell of actions.values()) {
+    try {
+      const slice = actionCell.beginParse();
+      if (slice.remainingBits >= 32 && slice.loadUint(32) === 0x1d0cfbd3) {
+        return true;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  return false;
+};
+
+export const isLastOrderExpired = (lastOrder: LastOrder): boolean => {
+  if (lastOrder.executionStatus !== undefined) return false;
+  const expiresAt =
+    lastOrder.expiredAt ??
+    (lastOrder.orderInfo ? lastOrder.orderInfo.expiresAt.getTime() : undefined);
+  return expiresAt !== undefined && new Date().getTime() > expiresAt;
+};
 
 export interface MultisigInfo {
   address: AddressInfo;
@@ -405,6 +447,7 @@ export const checkMultisig = async (
             utime: tx.now,
             transactionHash: tx.hash,
             type: "execute",
+            summary: parseExecuteOutSummary(tx.out_msgs),
             order: {
               address: {
                 address: orderAddress,
@@ -453,20 +496,12 @@ export const checkMultisig = async (
 
           endParse(inBodySlice);
 
-          console.log("IN", {
-            queryId,
-            orderId,
-            orderAddress: orderAddress.toString(),
-            isSigner,
-            index,
-            expiredAt,
-            order,
-          });
-
           lastOrders.push({
             utime: tx.now,
             transactionHash: tx.hash,
             type: "new",
+            expiredAt: Number(expiredAt) * 1000,
+            isParamsUpdate: hasParamsUpdateAction(order),
             order: {
               address: {
                 address: orderAddress,
@@ -477,7 +512,6 @@ export const checkMultisig = async (
             },
           });
         } catch (e: any) {
-          console.log(e);
           lastOrders.push({
             utime: tx.now,
             transactionHash: tx.hash,
@@ -501,15 +535,38 @@ export const checkMultisig = async (
             transactionHash: lastOrder.transactionHash,
             type: lastOrder.type === "new" ? "pending" : "executed",
             order: lastOrder.order,
+            expiredAt: lastOrder.expiredAt,
+            summary: lastOrder.summary,
+            isParamsUpdate: lastOrder.isParamsUpdate,
           };
         } else {
-          if (
-            lastOrdersMap[orderId].type !== "executed" &&
+          const existing = lastOrdersMap[orderId];
+          if (lastOrder.type === "new") {
+            if (existing.type !== "executed") {
+              existing.expiredAt = lastOrder.expiredAt;
+            }
+            if (lastOrder.isParamsUpdate) {
+              existing.isParamsUpdate = true;
+            }
+          } else if (
+            existing.type !== "executed" &&
             lastOrder.type === "execute"
           ) {
-            lastOrdersMap[orderId].utime = lastOrder.utime;
-            lastOrdersMap[orderId].type = "executed";
+            existing.utime = lastOrder.utime;
+            existing.type = "executed";
+            existing.transactionHash = lastOrder.transactionHash;
+            existing.expiredAt = undefined;
+            existing.summary = lastOrder.summary;
           }
+        }
+      }
+
+      // Заявки обновления параметров не переводят GRAM: в столбце с суммой
+      // вместо значения из исходящих сообщений транзакции исполнения
+      // показываем подпись «Обновление».
+      for (const lastOrder of Object.values(lastOrdersMap)) {
+        if (lastOrder.type === "executed" && lastOrder.isParamsUpdate) {
+          lastOrder.summary = { gram: "Обновление" };
         }
       }
 
@@ -587,21 +644,34 @@ export const checkMultisig = async (
               false,
             );
             lastOrder.orderInfo = orderInfo;
-            const isExpired =
-              new Date().getTime() > orderInfo.expiresAt.getTime();
-            if (isExpired) {
+            if (orderInfo.isExecuted) {
               lastOrder.type = "executed";
-            } else if (
-              orderInfo.isMismatchSigners ||
-              orderInfo.isMismatchThreshold
-            ) {
-              lastOrder.type = "executed";
-              lastOrder.errorMessage =
-                "Подписанты или порог мультикошелька не совпадают с заявкой";
+              lastOrder.expiredAt = undefined;
+            } else {
+              const isExpired =
+                new Date().getTime() > orderInfo.expiresAt.getTime();
+              if (isExpired) {
+                lastOrder.type = "executed";
+              } else if (
+                orderInfo.isMismatchSigners ||
+                orderInfo.isMismatchThreshold
+              ) {
+                lastOrder.type = "executed";
+                lastOrder.errorMessage =
+                  "Подписанты или порог мультикошелька не совпадают с заявкой";
+              }
             }
           } catch (e) {
-            lastOrder.type = "executed";
-            lastOrder.errorMessage = e.message;
+            // Только однозначный признак "Контракт не активен" означает, что
+            // заявка исполнена или просрочена (контракт заявки уничтожен).
+            // Переходные ошибки API (timeout, rate limit, HTTP-сбой) не должны
+            // менять статус заявки и перекидывать её между разделами списка.
+            if (String(e.message).startsWith("Контракт не активен")) {
+              lastOrder.type = "executed";
+              lastOrder.errorMessage = e.message;
+            } else {
+              console.error("Failed to check order info:", e);
+            }
           }
         }
       };
@@ -633,6 +703,13 @@ export const checkMultisig = async (
           lastOrder.executionStatus = "success";
         }
       }
+
+      lastOrders.sort((a, b) => {
+        const aOld = a.type === "executed" || isLastOrderExpired(a);
+        const bOld = b.type === "executed" || isLastOrderExpired(b);
+        if (aOld !== bOld) return aOld ? 1 : -1;
+        return b.utime - a.utime;
+      });
       }
     } catch (e) {
       // Список заявок — некритичная часть страницы. Если его не удалось

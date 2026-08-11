@@ -21,6 +21,7 @@ import {
 } from "./utils/utils";
 import {
   checkMultisig,
+  isLastOrderExpired,
   LastOrder,
   MultisigInfo,
 } from "./multisig/MultisigChecker";
@@ -227,6 +228,54 @@ tonConnectUI.uiOptions = {
   uiPreferences: {
     theme: THEME.DARK,
   },
+  actionsConfiguration: {
+    skipRedirectToWallet: "never",
+  },
+};
+
+// tonConnectUI.sendTransaction может «зависнуть», если кошелёк не получает или
+// не отвечает на запрос: окно «Подтвердите действие» остаётся висеть, а кнопка
+// блокируется. Дожидаемся ответа с таймаутом и всегда прокидываем ошибку, чтобы
+// интерфейс не блокировался навсегда.
+const SEND_TRANSACTION_TIMEOUT_MS = 90000;
+
+type TonConnectTransaction = Parameters<
+  typeof tonConnectUI.sendTransaction
+>[0];
+
+const sendTransactionWithTimeout = async (
+  transaction: TonConnectTransaction,
+): Promise<void> => {
+  let settled = false;
+  let timer: any;
+  await new Promise<void>((resolve, reject) => {
+    timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(
+          new Error(
+            "Кошелёк не ответил. Откройте приложение кошелька и подтвердите действие, либо попробуйте ещё раз.",
+          ),
+        );
+      }
+    }, SEND_TRANSACTION_TIMEOUT_MS);
+    tonConnectUI.sendTransaction(transaction).then(
+      () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve();
+        }
+      },
+      (error) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        }
+      },
+    );
+  });
 };
 
 // Кнопка TON Connect: стандартный текст «Подключить кошелёк» не помещается на
@@ -398,6 +447,7 @@ const renderCurrentMultisigInfo = (): void => {
       isMe,
       undefined,
       getDnsName(signer.address),
+      true,
     );
   }
   $("#multisig_signersList").innerHTML = signersHTML;
@@ -415,6 +465,7 @@ const renderCurrentMultisigInfo = (): void => {
         isMe,
         undefined,
         getDnsName(proposer.address),
+        true,
       );
     }
     $("#multisig_proposersList").innerHTML = proposersHTML;
@@ -426,66 +477,109 @@ const renderCurrentMultisigInfo = (): void => {
 
   // Render Last Orders
 
-  const formatOrderType = (lastOrder: LastOrder): string => {
-    switch (lastOrder.type) {
-      case "new":
-        return "Новая заявка";
-      case "execute":
-        return "Исполнение заявки";
-      case "pending":
-        return "Ожидающая заявка";
-      case "executed":
-        return "Исполненная заявка";
-    }
-    throw new Error("unknown order type " + lastOrder.type);
+  const orderStatusIcon = (executed: boolean, expired: boolean): string => {
+    const color = executed ? "#2ecc71" : "#4da3ff";
+    const shape = expired
+      ? '<path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>'
+      : '<path d="M4.6 8.4l2.3 2.3 4.6-4.9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+    return `<svg class="orderStatusIcon" width="32" height="32" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.5" fill="${color}"/>${shape}</svg>`;
   };
 
   const formatOrder = (lastOrder: LastOrder): string => {
+    const orderId = lastOrder.order.id;
+    const orderAddress = addressToString(lastOrder.order.address);
+    const orderBox = `<div class="multisig_lastOrder" order-id="${orderId}" order-address="${orderAddress}">`;
+    const txLink = (): string =>
+      `<a class="orderListItem_link" href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">ссылка</a>`;
+    const isExpired = isLastOrderExpired(lastOrder);
+    const orderInfo = lastOrder.orderInfo;
+    // Для исполненных/просроченных заявок деталей контракта нет (контракт
+    // уничтожен) — сумма GRAM берётся из исходящих сообщений транзакции
+    // исполнения, собранных при сканировании.
+    const summary = orderInfo?.summary ?? lastOrder.summary;
+
+    let icon = "";
+    let state = "";
+    let showLink = false;
+
     if (lastOrder.errorMessage) {
-      if (lastOrder.errorMessage.startsWith("Контракт не активен")) return ``;
-      if (lastOrder.errorMessage.startsWith("Неудача")) {
-        return `<div class="multisig_lastOrder" order-id="${lastOrder.order.id}" order-address="${addressToString(lastOrder.order.address)}"><span class="orderListItem_title">Неудачная заявка №${lastOrder.order.id}</span> — Ошибка выполнения — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a></div>`;
+      if (lastOrder.errorMessage.startsWith("Контракт не активен")) {
+        if (isExpired) {
+          icon = orderStatusIcon(false, true);
+          state = "просрочена";
+          showLink = true;
+        } else {
+          state = "контракт ещё не активен";
+        }
+      } else if (lastOrder.errorMessage.startsWith("Неудача")) {
+        icon = orderStatusIcon(false, false);
+        state = "ошибка выполнения";
+        showLink = true;
+      } else {
+        icon = orderStatusIcon(false, false);
+        state = "недействительна";
       }
-      return `<div class="multisig_lastOrder" order-id="${lastOrder.order.id}" order-address="${addressToString(lastOrder.order.address)}"><span class="orderListItem_title">Недействительная заявка №${lastOrder.order.id}</span> — ${lastOrder.errorMessage}</div>`;
     } else {
-      const isExpired = lastOrder.orderInfo
-        ? new Date().getTime() > lastOrder.orderInfo.expiresAt.getTime()
-        : false;
-      const actionText = isExpired
-        ? "Просроченная заявка "
-        : formatOrderType(lastOrder);
-      let text = `<span class="orderListItem_title">${actionText} #${lastOrder.order.id}</span>`;
-
-      if (lastOrder.type === "pending" && !isExpired && lastOrder.orderInfo) {
-        text += ` — ${lastOrder.orderInfo.approvalsNum}/${lastOrder.orderInfo.threshold}`;
+      if (isExpired) {
+        icon = orderStatusIcon(false, true);
+        state = "просрочена";
+      } else if (lastOrder.type === "executed") {
+        icon = orderStatusIcon(true, false);
+        state = "выполнено";
       }
+      if (lastOrder.type === "executed") {
+        showLink = true;
+      }
+    }
 
-      if (
-        lastOrder.type === "pending" &&
-        myAddress &&
-        lastOrder.orderInfo
-      ) {
-        const myIndex = lastOrder.orderInfo.signers.findIndex((signer) =>
+    let approvals = "";
+    if (orderInfo) {
+      approvals = `Подтверждений: ${orderInfo.approvalsNum}/${orderInfo.threshold}`;
+      if (lastOrder.type === "pending" && myAddress) {
+        const myIndex = orderInfo.signers.findIndex((signer) =>
           signer.address.equals(myAddress),
         );
         if (myIndex > -1) {
           const mask = 1 << myIndex;
-          const isSigned = lastOrder.orderInfo.approvalsMask & mask;
-
-          text += isSigned ? " — Вы подтвердили" : ` — Вы ещё не подтвердили`;
+          const isSigned = orderInfo.approvalsMask & mask;
+          approvals += isSigned
+            ? " — Вы подтвердили"
+            : " — Вы ещё не подтвердили";
         }
       }
-
-      if (lastOrder.type === "executed") {
-        if (lastOrder.executionStatus === "checking") {
-          text += ` — Проверка статуса транзакции… — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
-        } else {
-          text += ` — <a href="https://tonviewer.com/transaction/${base64toHex(lastOrder.transactionHash)}" target="_blank">Ссылка на транзакцию</a>`;
-        }
-      }
-
-      return `<div class="multisig_lastOrder" order-id="${lastOrder.order.id}" order-address="${addressToString(lastOrder.order.address)}">${text}</div>`;
     }
+
+    const jettonLine =
+      summary && summary.jetton
+        ? `${summary.jetton.amount} жетонов · ${
+            summary.jetton.kind === "mint" ? "выпуск" : "отправка"
+          }`
+        : "";
+    const gramHTML = summary?.gram
+      ? `<div class="orderListItem_gramCol">${summary.gram}</div>`
+      : "";
+    let statsHTML = "";
+    if (jettonLine || showLink) {
+      statsHTML =
+        `<div class="orderListItem_stats">` +
+        (jettonLine ? `<div class="orderListItem_jetton">${jettonLine}</div>` : "") +
+        (showLink ? txLink() : "") +
+        `</div>`;
+    }
+
+    return (
+      orderBox +
+      `<div class="orderListItem_status">${icon}</div>` +
+      `<div class="orderListItem_info">` +
+      `<div class="orderListItem_title">Заявка #${orderId}` +
+      (state ? `<span class="orderListItem_state"> — ${state}</span>` : "") +
+      `</div>` +
+      (approvals ? `<div class="orderListItem_approvals">${approvals}</div>` : "") +
+      `</div>` +
+      gramHTML +
+      statsHTML +
+      `</div>`
+    );
   };
 
   let lastOrdersHTML = "";
@@ -502,7 +596,7 @@ const renderCurrentMultisigInfo = (): void => {
   );
 
   for (const lastOrder of pageOrders) {
-    if (lastOrder.type == "executed") {
+    if (lastOrder.type == "executed" || isLastOrderExpired(lastOrder)) {
       if (!wasExecuted) {
         lastOrdersHTML += '<div class="label">Старые заявки:</div>';
         wasExecuted = true;
@@ -514,7 +608,16 @@ const renderCurrentMultisigInfo = (): void => {
       }
     }
 
-    lastOrdersHTML += formatOrder(lastOrder);
+    try {
+      lastOrdersHTML += formatOrder(lastOrder);
+    } catch (e) {
+      // Одна некорректная заявка не должна ломать весь список.
+      console.error("Failed to render order row:", e);
+      lastOrdersHTML +=
+        `<div class="multisig_lastOrder"><div class="orderListItem_info">` +
+        `<div class="orderListItem_title">Заявка #${lastOrder.order?.id ?? "?"} — не отображается</div>` +
+        `</div></div>`;
+    }
   }
 
   lastOrdersHTML += `
@@ -571,7 +674,19 @@ const updateMultisig = async (
     // Render if still relevant
 
     if (currentMultisigAddress !== multisigAddress) return;
+    const previousMultisigInfo = currentMultisigInfo;
     currentMultisigInfo = multisigInfo;
+
+    // Если список заявок не загрузился (rate limit, сбой API) — не очищаем
+    // уже отображённые заявки, а оставляем предыдущие, чтобы строки списка
+    // не пропадали и не появлялись в такт обновлениям.
+    if (
+      multisigInfo.lastOrders.length === 0 &&
+      previousMultisigInfo &&
+      previousMultisigInfo.lastOrders.length > 0
+    ) {
+      multisigInfo.lastOrders = previousMultisigInfo.lastOrders;
+    }
 
     const registryEntry = findMultisigRegistryEntry(multisigAddress);
     renderMultisigCard(registryEntry);
@@ -1262,8 +1377,6 @@ $("#order_approveButton").addEventListener("click", async () => {
     .toBoc()
     .toString("base64");
 
-  console.log({ orderAddressString, amount });
-
   const transaction = {
     validUntil: Math.floor(Date.now() / 1000) + 60, // 1 minute
     messages: [
@@ -1282,7 +1395,7 @@ $("#order_approveButton").addEventListener("click", async () => {
   );
 
   try {
-    const result = await tonConnectUI.sendTransaction(transaction);
+    await sendTransactionWithTimeout(transaction);
   } catch (e) {
     console.error(e);
     localStorage.removeItem(
@@ -2114,7 +2227,7 @@ $("#newOrder_createButton").addEventListener("click", async () => {
     if (!transactionToSent) throw new Error("");
 
     try {
-      const result = await tonConnectUI.sendTransaction({
+      await sendTransactionWithTimeout({
         validUntil: Math.floor(Date.now() / 1000) + 60, // 1 minute
         messages: [transactionToSent.message],
       });
@@ -2232,14 +2345,6 @@ $("#newOrder_createButton").addEventListener("click", async () => {
     0n,
   );
   const messageBase64 = message.toBoc().toString("base64");
-
-  console.log({
-    toAddress,
-    tonAmount,
-    payloadCell,
-    message,
-    orderId,
-  });
 
   const multisigAddressString = currentMultisigAddress;
   const amount = AMOUNT_TO_SEND.toString();
@@ -2508,7 +2613,7 @@ $("#newMultisig_createButton").addEventListener("click", async () => {
       const orderId = newMultisigTransactionToSend.orderId;
       const multisigAddress = newMultisigTransactionToSend.multisigAddress;
 
-      const result = await tonConnectUI.sendTransaction({
+      await sendTransactionWithTimeout({
         validUntil: Math.floor(Date.now() / 1000) + 60, // 1 minute
         messages: [newMultisigTransactionToSend.message],
       });
@@ -2794,8 +2899,6 @@ const processUrl = async () => {
 
   if (urlPostfix) {
     const { multisigAddress, orderId } = parseUrl(urlPostfix);
-
-    console.log(multisigAddress, orderId);
 
     if (multisigAddress === undefined) {
       alert("Некорректный URL");
