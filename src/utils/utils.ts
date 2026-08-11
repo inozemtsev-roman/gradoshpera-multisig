@@ -129,13 +129,15 @@ const avatarColor = (addressString: string): string =>
 // Карточка-аватар адреса: квадрат со скруглёнными углами в цвете адреса,
 // внутри — круг того же цвета с акцентным текстом (первые 2 и последние 2
 // символа адреса); справа сверху круга — плашка статуса (✅/❌); ниже по
-// центру — сокращённый адрес (6 + … + 4 символа), справа от адреса — плашка
-// «Вы» для вашего кошелька.
+// центру — сокращённый адрес (6 + … + 4 символа). Плашка «Вы» для вашего
+// кошелька: при meOnCircle — в правом верхнем углу круга, иначе справа от
+// адреса.
 export const addressAvatarHTML = (
   address: AddressInfo,
   isMe: boolean,
   statusBadge?: string,
   dnsName?: string,
+  meOnCircle = false,
 ): string => {
   const addressString = addressToString(address);
   const color = avatarColor(addressString);
@@ -151,17 +153,20 @@ export const addressAvatarHTML = (
     : shortAddr;
   const url = explorerUrl(addressString, address.isTestOnly);
   const title = dnsName ? `${dnsName} (${addressString})` : addressString;
+  const meOnCircleBadge =
+    meOnCircle && isMe ? '<div class="daoAvatarMeBadge">Вы</div>' : "";
   return `
         <a class="daoAvatarCard" href="${url}" target="_blank" title="${title}">
             <div class="daoAvatarTile" style="background:${color}2e">
                 <div class="daoAvatarCircleWrap">
                     <div class="daoAvatarCircle" style="background:${color}">${circleText}</div>
+                    ${meOnCircleBadge}
                     ${statusBadge ? `<div class="daoAvatarStatusBadge">${statusBadge}</div>` : ""}
                 </div>
             </div>
             <div class="daoAvatarMeta">
                 <span class="daoAvatarAddress">${label}</span>
-                ${isMe ? '<span class="daoAvatarMe">Вы</span>' : ""}
+                ${isMe && !meOnCircle ? '<span class="daoAvatarMe">Вы</span>' : ""}
             </div>
         </a>`;
 };

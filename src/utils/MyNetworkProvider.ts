@@ -206,9 +206,11 @@ const tonapiMessageToCanonical = (msg: any): any => {
   if (msg.op_code != null) canonical.opcode = msg.op_code;
   if (msg.decoded_op_name != null)
     canonical.decoded_opcode = msg.decoded_op_name;
+  if (msg.value != null) canonical.value = String(msg.value);
   const body = hexToBase64IfNeeded(msg.raw_body);
   if (body) canonical.message_content = { body };
-  if (msg.init?.boc) canonical.init_state = { body: msg.init.boc };
+  if (msg.init?.boc)
+    canonical.init_state = { body: hexToBase64IfNeeded(msg.init.boc) };
   return canonical;
 };
 

@@ -47,6 +47,13 @@ export interface MultisigOrderInfo {
   signers: AddressInfo[];
   expiresAt: Date;
   actions: string[];
+  summary?: {
+    gram: string;
+    jetton?: {
+      amount: string;
+      kind: "mint" | "transfer";
+    };
+  };
   stateInitMatches: boolean;
   isMismatchSigners: boolean;
   isMismatchThreshold: boolean;
@@ -201,11 +208,13 @@ export const checkMultisigOrder = async (
     parsedData.order,
   );
 
-  const parseActionBody = async (cell: Cell): Promise<string> => {
+  const parseActionBody = async (
+    cell: Cell,
+  ): Promise<{ text: string; jetton?: { amount: string; kind: "mint" | "transfer" } }> => {
     try {
       const slice = cell.beginParse();
       if (slice.remainingBits === 0 && slice.remainingRefs == 0) {
-        return "Отправить GRAM с мультикошелька без комментария";
+        return { text: "Отправить GRAM с мультикошелька без комментария" };
       }
     } catch (e) {}
 
@@ -214,7 +223,9 @@ export const checkMultisigOrder = async (
       const op = slice.loadUint(32);
       if (op == 0) {
         const text = slice.loadStringTail();
-        return `Отправить GRAM с мультикошелька с комментарием "${sanitizeHTML(text)}"`;
+        return {
+          text: `Отправить GRAM с мультикошелька с комментарием "${sanitizeHTML(text)}"`,
+        };
       }
     } catch (e) {}
 
@@ -227,13 +238,19 @@ export const checkMultisigOrder = async (
         "Mint forward payload not supported",
       );
       const toAddress = await formatAddressAndUrl(parsed.toAddress, isTestnet);
-      return `Минт ${parsed.internalMessage.jettonAmount} жетонов (в единицах) на ${toAddress}; ${fromNano(parsed.tonAmount)} GRAM на газ`;
+      return {
+        text: `Минт ${parsed.internalMessage.jettonAmount} жетонов (в единицах) на ${toAddress}; ${fromNano(parsed.tonAmount)} GRAM на газ`,
+        jetton: {
+          amount: parsed.internalMessage.jettonAmount.toString(),
+          kind: "mint",
+        },
+      };
     } catch (e) {}
 
     try {
       const slice = cell.beginParse();
       const parsed = JettonMinter.parseTopUp(slice);
-      return `Пополнение`;
+      return { text: `Пополнение` };
     } catch (e) {}
 
     try {
@@ -243,19 +260,21 @@ export const checkMultisigOrder = async (
         parsed.newAdminAddress,
         isTestnet,
       );
-      return `Сменить администратора на ${newAdminAddress}`;
+      return { text: `Сменить администратора на ${newAdminAddress}` };
     } catch (e) {}
 
     try {
       const slice = cell.beginParse();
       const parsed = JettonMinter.parseClaimAdmin(slice);
-      return `Принять управление`;
+      return { text: `Принять управление` };
     } catch (e) {}
 
     try {
       const slice = cell.beginParse();
       const parsed = JettonMinter.parseChangeContent(slice);
-      return `Изменить URL метаданных на "${sanitizeHTML(parsed.newMetadataUrl)}"`;
+      return {
+        text: `Изменить URL метаданных на "${sanitizeHTML(parsed.newMetadataUrl)}"`,
+      };
     } catch (e) {}
 
     try {
@@ -282,7 +301,13 @@ export const checkMultisigOrder = async (
       }
 
       const toAddress = await formatAddressAndUrl(parsed.toAddress, isTestnet);
-      return `Перевод ${parsed.jettonAmount} жетонов (в единицах) с мультикошелька пользователю ${toAddress} ${comment};`;
+      return {
+        text: `Перевод ${parsed.jettonAmount} жетонов (в единицах) с мультикошелька пользователю ${toAddress} ${comment};`,
+        jetton: {
+          amount: parsed.jettonAmount.toString(),
+          kind: "transfer",
+        },
+      };
     } catch (e) {}
 
     try {
@@ -296,7 +321,9 @@ export const checkMultisigOrder = async (
         isTestnet,
       );
       const lockType = intToLockType(parsed.action.newStatus);
-      return `Блокировка кошелька жетонов пользователя ${userAddress}. Установить статус "${lockType}" - "${lockTypeToDescription(lockType)}"; ${fromNano(parsed.tonAmount)} GRAM на газ`;
+      return {
+        text: `Блокировка кошелька жетонов пользователя ${userAddress}. Установить статус "${lockType}" - "${lockTypeToDescription(lockType)}"; ${fromNano(parsed.tonAmount)} GRAM на газ`,
+      };
     } catch (e) {}
 
     try {
@@ -320,7 +347,13 @@ export const checkMultisigOrder = async (
         parsed.action.toAddress,
         isTestnet,
       );
-      return `Принудительный перевод ${parsed.action.jettonAmount} жетонов (в единицах) от пользователя ${fromAddress} к ${toAddress}; ${fromNano(parsed.tonAmount)} GRAM за газ`;
+      return {
+        text: `Принудительный перевод ${parsed.action.jettonAmount} жетонов (в единицах) от пользователя ${fromAddress} к ${toAddress}; ${fromNano(parsed.tonAmount)} GRAM за газ`,
+        jetton: {
+          amount: parsed.action.jettonAmount.toString(),
+          kind: "transfer",
+        },
+      };
     } catch (e) {}
 
     try {
@@ -332,7 +365,9 @@ export const checkMultisigOrder = async (
         parsed.toAddress,
         isTestnet,
       );
-      return `Принудительное сжигание ${parsed.action.jettonAmount} жетонов (в единицах) у пользователя ${userAddress}; ${fromNano(parsed.tonAmount)} GRAM на газ`;
+      return {
+        text: `Принудительное сжигание ${parsed.action.jettonAmount} жетонов (в единицах) у пользователя ${userAddress}; ${fromNano(parsed.tonAmount)} GRAM на газ`,
+      };
     } catch (e) {}
 
     try {
@@ -342,7 +377,9 @@ export const checkMultisigOrder = async (
       if (op === SINGLE_NOMINATOR_POOL_OP_WITHDRAW) {
         const queryId = slice.loadUint(64);
         const coins = slice.loadCoins();
-        return `Вывод ${fromNano(coins)} TON из пула единого номинатора.`;
+        return {
+          text: `Вывод ${fromNano(coins)} TON из пула единого номинатора.`,
+        };
       }
     } catch (e) {}
 
@@ -358,7 +395,9 @@ export const checkMultisigOrder = async (
           isTestnet,
         );
 
-        return `Сменить валидатора на ${validatorAddressUrl} в пуле единого номинатора.`;
+        return {
+          text: `Сменить валидатора на ${validatorAddressUrl} в пуле единого номинатора.`,
+        };
       }
     } catch (e) {}
 
@@ -401,16 +440,22 @@ export const checkMultisigOrder = async (
           actionString += ` с данными: "${messageBodyBoc.toString("base64")}". `;
         }
 
-        return actionString;
+        return { text: actionString };
       }
     } catch (e) {
       console.error(e);
     }
 
-    return `<b><span class="error">ВНИМАНИЕ - Неизвестное действие! Эта заявка содержит произвольные действия! Опасно! Не подписывайте, если точно не знаете, что делаете!</span></b><br>Необработанные данные тела сообщения: "${cell.toBoc().toString("base64")}".`;
+    return {
+      text: `<b><span class="error">ВНИМАНИЕ - Неизвестное действие! Эта заявка содержит произвольные действия! Опасно! Не подписывайте, если точно не знаете, что делаете!</span></b><br>Необработанные данные тела сообщения: "${cell.toBoc().toString("base64")}".`,
+    };
   };
 
   let parsedActions: string[] = [];
+  let summaryGram = "";
+  let summaryJetton:
+    | { amount: string; kind: "mint" | "transfer" }
+    | undefined = undefined;
 
   const actionsKeys = actions.keys();
   for (let key of actionsKeys) {
@@ -450,7 +495,6 @@ export const checkMultisigOrder = async (
       const actionBody = slice.loadRef();
       endParse(slice);
       const messageRelaxed = loadMessageRelaxed(actionBody.beginParse());
-      console.log(messageRelaxed);
 
       const info: CommonMessageInfoRelaxedInternal = messageRelaxed.info as any;
 
@@ -463,10 +507,19 @@ export const checkMultisigOrder = async (
       }
 
       const destAddress = await formatAddressAndUrl(info.dest, isTestnet);
-      actionString += `<div>Отправить ${allBalance ? "ВЕСЬ БАЛАНС" : fromNano(info.value.coins)} GRAM на ${destAddress}</div>`;
-      actionString += `<div>${await parseActionBody(messageRelaxed.body)}</div>`;
+      const gramAmount = allBalance ? "ВЕСЬ БАЛАНС" : fromNano(info.value.coins);
+      actionString += `<div>Отправить ${gramAmount} GRAM на ${destAddress}</div>`;
+      const parsedBody = await parseActionBody(messageRelaxed.body);
+      actionString += `<div>${parsedBody.text}</div>`;
       if (sendMode) {
         actionString += `<div>Режим отправки: ${sendModeString.join(", ")}.</div>`;
+      }
+
+      if (!summaryGram) {
+        summaryGram = allBalance ? "ВЕСЬ БАЛАНС" : `${gramAmount} GRAM`;
+      }
+      if (!summaryJetton && parsedBody.jetton) {
+        summaryJetton = parsedBody.jetton;
       }
     } else if (actionOp === 0x1d0cfbd3) {
       // update_multisig_params
@@ -533,6 +586,10 @@ export const checkMultisigOrder = async (
     signers: signersFormatted,
     expiresAt: new Date(parsedData.expirationDate * 1000),
     actions: parsedActions,
+    summary: {
+      gram: summaryGram,
+      ...(summaryJetton ? { jetton: summaryJetton } : {}),
+    },
     stateInitMatches,
     isMismatchSigners,
     isMismatchThreshold,
