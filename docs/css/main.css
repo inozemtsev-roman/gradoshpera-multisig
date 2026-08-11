@@ -727,12 +727,43 @@ button:disabled,
   border-color: var(--link-color);
 }
 
+.daoMultisigAvatarWrap {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.daoMultisigAvatarWrap .badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  background-color: var(--link-color);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  height: auto;
+  line-height: 1;
+  transform: translate(50%, 100%);
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+}
+
+.daoMultisigAvatarWrap .badge.badgeSigner {
+  background-color: #2fbf71;
+}
+
+.daoMultisigAvatarWrap .badge.badgeProposer {
+  background-color: var(--link-color);
+}
+
 .daoMultisigAvatar {
   width: 80px;
   height: 80px;
   border-radius: 50%;
   overflow: hidden;
-  margin-bottom: 15px;
   display: flex;
   align-items: center;
   justify-content: center;

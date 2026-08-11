@@ -13,6 +13,7 @@ export interface RegistryEntry {
   name: string;
   address: string;
   testnet: boolean;
+  logo?: string;
   jetton?: RegistryJetton;
 }
 
@@ -52,6 +53,17 @@ const SNAPSHOT: RegistryFile = {
     {
       name: "ДАО Градосфера",
       address: "EQAbRLmFnI7y5BUmSVvxsz3X4Ejy50uMkgvXPmevthl5K3n9",
+      jetton: {
+        name: "Благо",
+        address: "EQBlaryI1HCY6hIlW9giBoqKGtuMHfxlULZOhD6UyzpqLcll",
+        decimals: 0,
+        logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/logo.svg",
+      },
+    },
+    {
+      name: "Чистая Лига",
+      address: "UQACfRYh7GcZJwtB6zI5bn1DO58MXj1GIyY1u94Eg4TJFp8v",
+      logo: "https://raw.githubusercontent.com/gradosphera/brand-assets/refs/heads/main/logo.svg",
       jetton: {
         name: "Благо",
         address: "EQBlaryI1HCY6hIlW9giBoqKGtuMHfxlULZOhD6UyzpqLcll",
@@ -124,6 +136,7 @@ const normalizeEntries = (file: RegistryFile): RegistryEntry[] =>
     name: e.name,
     address: e.address,
     testnet: e.testnet ?? file.testnet ?? false,
+    logo: e.logo,
     jetton: e.jetton,
   }));
 
