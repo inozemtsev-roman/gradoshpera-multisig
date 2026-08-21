@@ -721,6 +721,7 @@ button:disabled,
   padding: 20px;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
+  position: relative;
 }
 
 .daoMultisigItem:hover {
@@ -757,6 +758,31 @@ button:disabled,
 
 .daoMultisigAvatarWrap .badge.badgeProposer {
   background-color: var(--link-color);
+}
+
+.daoMultisigRemoveBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.2s;
+}
+
+.daoMultisigRemoveBadge:hover {
+  background-color: var(--error);
 }
 
 .daoMultisigAvatar {
