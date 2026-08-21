@@ -48,11 +48,13 @@ import { storeStateInit } from "@ton/core/src/types/StateInit";
 import { MyNetworkProvider, sendToIndex } from "./utils/MyNetworkProvider";
 import { fetchDnsNames, getDnsName } from "./utils/Dns";
 import {
+  addHiddenMultisig,
   addOpenedMultisig,
   fetchJettonBalance,
   fetchMultisigStatus,
   fetchRegistry,
   getSnapshotEntries,
+  loadHiddenMultisigs,
   loadOpenedMultisigs,
   mapWithConcurrency,
   MultisigStatus,
@@ -1105,7 +1107,14 @@ const daoMultisigItemHTML = (
   const avatar = logo || jettonInfo?.logo || GRAM_LOGO_URL;
   const balances = lines.map((l) => `<div>${l}</div>`).join("");
 
-  return `<div class="daoMultisigItem${mine ? " daoMultisigMine" : ""}" data-address="${address}"><div class="daoMultisigAvatarWrap"><div class="daoMultisigAvatar"><img src="${avatar}" alt=""></div>${roleBadgeHTML(status.role)}</div><div class="daoMultisigName">${sanitizeHTML(name) || "Мультикошелек"}</div><div class="daoMultisigAddress">${makeAddressLink(info)}</div><div class="daoMultisigBalances">${balances}</div></div>`;
+  // Импортированный адрес оказался не мультикошельком (код кошелька не совпал
+  // с кодом мультикошелька) — показываем крестик, скрывающий карточку.
+  const removeBadge =
+    mine && status.ok && !status.isMultisig
+      ? '<button class="daoMultisigRemoveBadge" title="Скрыть карточку">✕</button>'
+      : "";
+
+  return `<div class="daoMultisigItem${mine ? " daoMultisigMine" : ""}" data-address="${address}">${removeBadge}<div class="daoMultisigAvatarWrap"><div class="daoMultisigAvatar"><img src="${avatar}" alt=""></div>${roleBadgeHTML(status.role)}</div><div class="daoMultisigName">${sanitizeHTML(name) || "Мультикошелек"}</div><div class="daoMultisigAddress">${makeAddressLink(info)}</div><div class="daoMultisigBalances">${balances}</div></div>`;
 };
 
 interface DaoListItem {
@@ -1131,11 +1140,12 @@ const formatJettonAmount = (balance: string, decimals: number): string => {
 const buildDaoListItems = (entries: RegistryEntry[]): DaoListItem[] => {
   const seen = new Set<string>();
   const items: DaoListItem[] = [];
+  const hidden = loadHiddenMultisigs();
 
   for (const entry of entries) {
     if (entry.testnet !== IS_TESTNET) continue;
     const raw = rawOfRegistry(entry.address);
-    if (seen.has(raw)) continue;
+    if (seen.has(raw) || hidden.has(raw)) continue;
     seen.add(raw);
     items.push({
       name: entry.name,
@@ -1151,7 +1161,7 @@ const buildDaoListItems = (entries: RegistryEntry[]): DaoListItem[] => {
   for (const entry of getSnapshotEntries()) {
     if (entry.testnet !== IS_TESTNET) continue;
     const raw = rawOfRegistry(entry.address);
-    if (seen.has(raw)) continue;
+    if (seen.has(raw) || hidden.has(raw)) continue;
     seen.add(raw);
     items.push({
       name: entry.name,
@@ -1166,7 +1176,7 @@ const buildDaoListItems = (entries: RegistryEntry[]): DaoListItem[] => {
     const opened = loadOpenedMultisigs();
     for (const openedItem of opened) {
       const raw = rawOfRegistry(openedItem.address);
-      if (seen.has(raw)) continue;
+      if (seen.has(raw) || hidden.has(raw)) continue;
       seen.add(raw);
       items.push({ name: "", address: openedItem.address, mine: true });
     }
@@ -1294,6 +1304,21 @@ daoMultisigsList.addEventListener("click", (e) => {
   const itemEl = target.closest(".daoMultisigItem");
   if (!itemEl) return;
   const address = itemEl.getAttribute("data-address");
+
+  const removeBadge = target.closest(".daoMultisigRemoveBadge");
+  if (removeBadge) {
+    if (address) addHiddenMultisig(address);
+    itemEl.remove();
+    const remaining = daoMultisigsList.querySelector(
+      ".daoMultisigItem.daoMultisigMine",
+    );
+    if (!remaining) {
+      const label = daoMultisigsList.querySelector(".daoMultisigMineLabel");
+      if (label) label.remove();
+    }
+    return;
+  }
+
   if (address) {
     setMultisigAddress(address);
   }

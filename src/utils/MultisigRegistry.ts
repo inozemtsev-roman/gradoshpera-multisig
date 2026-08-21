@@ -310,6 +310,37 @@ export const loadOpenedMultisigs = (): OpenedMultisig[] => {
   }
 };
 
+const HIDDEN_MULTISIGS_KEY = "hiddenMultisigs";
+
+// Импортированные кошельки, которые пользователь скрыл с главной страницы
+// (например, адрес, не являющийся мультикошельком). Храним raw-адреса.
+export const loadHiddenMultisigs = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(HIDDEN_MULTISIGS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed.filter((x: any) => typeof x === "string").map((x: string) => x),
+    );
+  } catch {
+    return new Set();
+  }
+};
+
+export const addHiddenMultisig = (friendlyAddress: string): void => {
+  try {
+    const hidden = loadHiddenMultisigs();
+    hidden.add(rawOf(friendlyAddress));
+    localStorage.setItem(
+      HIDDEN_MULTISIGS_KEY,
+      JSON.stringify(Array.from(hidden)),
+    );
+  } catch {
+    // ignore
+  }
+};
+
 const rawOf = (friendly: string): string => {
   try {
     return Address.parseFriendly(friendly).address.toRawString();
